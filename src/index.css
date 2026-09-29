@@ -1,0 +1,104 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Fraunces', ui-serif, Georgia, serif;
+  --font-hand: 'Caveat', 'Segoe Print', 'Bradley Hand', cursive;
+
+  --color-desk: #efe6d6;
+  --color-paper: #faf6ee;
+  --color-ink: #2b2622;
+  --color-ink-soft: #6b625a;
+  --color-accent: #b8452f;
+  --color-accent-dark: #933521;
+  --color-line: #e2d7c4;
+
+  --shadow-polaroid: 0 1px 2px rgb(0 0 0 / 0.08), 0 6px 14px -4px rgb(60 40 20 / 0.25);
+  --shadow-lift: 0 4px 8px rgb(0 0 0 / 0.08), 0 24px 40px -12px rgb(60 40 20 / 0.45);
+  --shadow-book: 2px 3px 0 rgb(0 0 0 / 0.08), 8px 14px 24px -8px rgb(60 30 10 / 0.45);
+}
+
+@layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    @apply bg-desk font-sans text-ink antialiased;
+    min-height: 100dvh;
+    background-image:
+      radial-gradient(rgb(120 90 60 / 0.05) 1px, transparent 1px),
+      radial-gradient(rgb(120 90 60 / 0.04) 1px, transparent 1px);
+    background-size: 22px 22px, 37px 37px;
+    background-position: 0 0, 11px 17px;
+  }
+
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-accent;
+  }
+
+  button:not(:disabled),
+  [role='button']:not([aria-disabled='true']) {
+    cursor: pointer;
+  }
+}
+
+@layer components {
+  .paper {
+    background-color: var(--book-bg, var(--color-paper));
+    background-image:
+      linear-gradient(90deg, rgb(0 0 0 / 0.06), transparent 18px),
+      radial-gradient(ellipse at 30% 10%, rgb(255 255 255 / 0.35), transparent 60%),
+      radial-gradient(rgb(0 0 0 / 0.035) 1px, transparent 1px);
+    background-size: auto, auto, 5px 5px;
+  }
+
+  .tape {
+    position: absolute;
+    top: -12px;
+    left: 50%;
+    width: 72px;
+    height: 24px;
+    translate: -50% 0;
+    rotate: var(--tape-rotate, -2deg);
+    background: linear-gradient(180deg, rgb(255 250 235 / 0.75), rgb(240 230 205 / 0.65));
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.12);
+    mask-image: linear-gradient(90deg, transparent 0 2px, #000 2px calc(100% - 2px), transparent calc(100% - 2px));
+    pointer-events: none;
+  }
+
+  .postit-fold {
+    background-image: linear-gradient(225deg, rgb(0 0 0 / 0.08) 0 14px, transparent 14px),
+      linear-gradient(180deg, rgb(255 255 255 / 0.25), transparent 30%);
+  }
+}
+
+@keyframes pop {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+}
+
+@keyframes develop {
+  from {
+    filter: sepia(1) brightness(1.6) blur(2px);
+    opacity: 0.4;
+  }
+}
+
+@keyframes stick {
+  from {
+    opacity: 0;
+    transform: translateY(-10px) scale(1.06);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

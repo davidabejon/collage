@@ -1,0 +1,50 @@
+from datetime import UTC, datetime
+
+from sqlmodel import Field, Relationship, SQLModel
+
+
+def utcnow() -> datetime:
+    return datetime.now(UTC)
+
+
+class User(SQLModel, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+    username: str = Field(index=True, unique=True, max_length=32)
+    password_hash: str
+    created_at: datetime = Field(default_factory=utcnow)
+
+    books: list["Book"] = Relationship(
+        back_populates="owner", sa_relationship_kwargs={"cascade": "all, delete-orphan"}
+    )
+
+
+class Book(SQLModel, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+    owner_id: int = Field(foreign_key="user.id", index=True, ondelete="CASCADE")
+    title: str = Field(max_length=80)
+    bg_color: str = "#f5efe3"
+    text_color: str = "#2b2622"
+    cover_color: str = "#8c3b2e"
+    created_at: datetime = Field(default_factory=utcnow)
+    updated_at: datetime = Field(default_factory=utcnow)
+
+    owner: User = Relationship(back_populates="books")
+    items: list["Item"] = Relationship(
+        back_populates="book",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan", "order_by": "Item.position"},
+    )
+
+
+class Item(SQLModel, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+    book_id: int = Field(foreign_key="book.id", index=True, ondelete="CASCADE")
+    type: str = Field(max_length=8)  # "photo" | "note"
+    position: int = 0
+    image_path: str | None = None
+    thumb_path: str | None = None
+    caption: str = Field(default="", max_length=140)
+    text: str = Field(default="", max_length=500)
+    note_color: str = "#fff176"
+    created_at: datetime = Field(default_factory=utcnow)
+
+    book: Book = Relationship(back_populates="items")
