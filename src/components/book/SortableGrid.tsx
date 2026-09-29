@@ -19,7 +19,7 @@ import {
   useSortable,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { useState, type KeyboardEventHandler, type ReactNode } from 'react'
+import { useEffect, useState, type CSSProperties, type KeyboardEventHandler, type ReactNode } from 'react'
 import type { Item, ItemUpdate } from '../../api/types'
 import { IconGrip } from '../../ui/icons'
 import { ItemView } from './ItemView'
@@ -38,8 +38,21 @@ const kindOf = (items: Item[], id: UniqueIdentifier) => (items.find((i) => i.id 
 const positionOf = (items: Item[], id: UniqueIdentifier) =>
   `posición ${items.findIndex((i) => i.id === id) + 1} de ${items.length}`
 
+function gridColumns() {
+  if (window.matchMedia('(min-width: 1280px)').matches) return 5
+  if (window.matchMedia('(min-width: 1024px)').matches) return 4
+  if (window.matchMedia('(min-width: 640px)').matches) return 3
+  return 2
+}
+
 export function SortableGrid({ items, textColor, trailing, onReorder, onUpdate, onDelete, onOpen }: Props) {
   const [activeId, setActiveId] = useState<UniqueIdentifier | null>(null)
+  const [columns, setColumns] = useState(gridColumns)
+  useEffect(() => {
+    const updateColumns = () => setColumns(gridColumns())
+    window.addEventListener('resize', updateColumns)
+    return () => window.removeEventListener('resize', updateColumns)
+  }, [])
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 220, tolerance: 8 } }),
@@ -78,19 +91,25 @@ export function SortableGrid({ items, textColor, trailing, onReorder, onUpdate, 
       }}
     >
       <SortableContext items={items.map((i) => i.id)} strategy={rectSortingStrategy}>
-        <ul className="grid grid-cols-2 items-start gap-x-4 gap-y-8 sm:grid-cols-3 sm:gap-x-8 sm:gap-y-12 lg:grid-cols-4 xl:grid-cols-5">
-          {items.map((item) => (
-            <SortableItem
-              key={item.id}
-              item={item}
-              textColor={textColor}
-              onUpdate={(data) => onUpdate(item.id, data)}
-              onDelete={() => onDelete(item)}
-              onOpen={() => onOpen(item)}
-            />
-          ))}
-          {trailing}
-        </ul>
+        <div className="[container-type:inline-size]">
+          <ul
+            className="grid grid-cols-2 gap-4 sm:grid-cols-3 sm:gap-8 lg:grid-cols-4 xl:grid-cols-5"
+            style={{ gridAutoRows: `calc((100cqw - ${columns - 1} * var(--grid-gap)) / ${columns})`, '--grid-gap': columns > 2 ? '2rem' : '1rem' } as CSSProperties}
+          >
+            {items.map((item) => (
+              <SortableItem
+                key={item.id}
+                item={item}
+                columns={columns}
+                textColor={textColor}
+                onUpdate={(data) => onUpdate(item.id, data)}
+                onDelete={() => onDelete(item)}
+                onOpen={() => onOpen(item)}
+              />
+            ))}
+            {trailing}
+          </ul>
+        </div>
       </SortableContext>
 
       <DragOverlay dropAnimation={{ duration: 220, easing: 'cubic-bezier(.2,.8,.2,1)' }}>
@@ -102,13 +121,14 @@ export function SortableGrid({ items, textColor, trailing, onReorder, onUpdate, 
 
 type SortableItemProps = {
   item: Item
+  columns: number
   textColor: string
   onUpdate: (data: ItemUpdate) => void
   onDelete: () => void
   onOpen: () => void
 }
 
-function SortableItem({ item, textColor, onUpdate, onDelete, onOpen }: SortableItemProps) {
+function SortableItem({ item, columns, textColor, onUpdate, onDelete, onOpen }: SortableItemProps) {
   const [editing, setEditing] = useState(false)
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
     id: item.id,
@@ -120,7 +140,7 @@ function SortableItem({ item, textColor, onUpdate, onDelete, onOpen }: SortableI
     <li
       ref={setNodeRef}
       {...pointerListeners}
-      style={{ transform: CSS.Translate.toString(transform), transition }}
+      style={{ transform: CSS.Translate.toString(transform), transition, gridColumn: `span ${item.type === 'photo' ? Math.min(item.span_columns, columns) : 1}`, gridRow: `span ${item.type === 'photo' ? item.span_rows : 1}` }}
       className={`group relative touch-manipulation select-none ${isDragging ? 'opacity-25' : ''} ${editing ? '' : 'cursor-grab active:cursor-grabbing'}`}
     >
       <ItemView

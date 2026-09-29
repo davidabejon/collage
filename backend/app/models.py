@@ -44,6 +44,8 @@ class Item(SQLModel, table=True):
     book_id: int = Field(foreign_key="book.id", index=True, ondelete="CASCADE")
     type: str = Field(max_length=8)  # "photo" | "note"
     position: int = 0
+    span_columns: int = Field(default=1, ge=1, le=50)
+    span_rows: int = Field(default=1, ge=1, le=50)
     image_path: str | None = None
     thumb_path: str | None = None
     caption: str = Field(default="", max_length=140)

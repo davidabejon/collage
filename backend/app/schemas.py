@@ -58,6 +58,8 @@ class ItemOut(BaseModel):
     created_at: datetime
     type: Literal["photo", "note"]
     position: int
+    span_columns: int
+    span_rows: int
     caption: str
     text: str
     note_color: str
@@ -76,6 +78,8 @@ class ItemUpdate(BaseModel):
     caption: str | None = Field(default=None, max_length=140)
     text: str | None = Field(default=None, max_length=500)
     note_color: HexColor | None = None
+    span_columns: int | None = Field(default=None, ge=1, le=50)
+    span_rows: int | None = Field(default=None, ge=1, le=50)
 
 
 class OrderUpdate(BaseModel):

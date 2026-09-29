@@ -1,6 +1,6 @@
 from collections.abc import Iterator
 
-from sqlalchemy import event
+from sqlalchemy import event, inspect, text
 from sqlmodel import Session, SQLModel, create_engine
 
 from .config import get_settings
@@ -25,6 +25,12 @@ def init_db() -> None:
     from . import models  # noqa: F401  (registers tables)
 
     SQLModel.metadata.create_all(engine)
+    if engine.dialect.name == "sqlite":
+        columns = {column["name"] for column in inspect(engine).get_columns("item")}
+        with engine.begin() as connection:
+            for name in ("span_columns", "span_rows"):
+                if name not in columns:
+                    connection.execute(text(f"ALTER TABLE item ADD COLUMN {name} INTEGER NOT NULL DEFAULT 1"))
 
 
 def get_session() -> Iterator[Session]:

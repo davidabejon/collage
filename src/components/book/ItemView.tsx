@@ -1,8 +1,8 @@
-import { useState, type CSSProperties } from 'react'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { mediaUrl } from '../../api/endpoints'
 import type { Item, ItemUpdate } from '../../api/types'
 import { NOTE_COLORS, readableOn, tiltFor } from '../../lib/design'
-import { IconExpand, IconPalette, IconTrash } from '../../ui/icons'
+import { IconExpand, IconPalette, IconSize, IconTrash } from '../../ui/icons'
 import { ActionBar, ActionButton, InlineText } from './ItemControls'
 import { stopDrag } from './stopDrag'
 
@@ -26,14 +26,33 @@ export function ItemView(props: ItemViewProps) {
 }
 
 function Polaroid({ item, textColor, lifted, onEditingChange, onUpdate, onDelete, onOpen }: ItemViewProps) {
+  const [sizeOpen, setSizeOpen] = useState(false)
+  const sizeButtonRef = useRef<HTMLSpanElement>(null)
+  const sizePanelRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!sizeOpen) return
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target as Node
+      if (!sizePanelRef.current?.contains(target) && !sizeButtonRef.current?.contains(target)) setSizeOpen(false)
+    }
+    const onKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key === 'Escape') setSizeOpen(false)
+    }
+    document.addEventListener('pointerdown', onPointerDown)
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown)
+      document.removeEventListener('keydown', onKeyDown)
+    }
+  }, [sizeOpen])
   const color = readableOn('#ffffff', textColor)
   return (
     <figure
-      className={`relative bg-white p-2 pb-0 transition-[rotate,scale,box-shadow] duration-200 sm:p-2.5 sm:pb-0 ${lifted ? 'shadow-lift' : 'shadow-polaroid'}`}
+      className={`relative flex h-full flex-col bg-white p-2 pb-0 transition-[rotate,scale,box-shadow] duration-200 sm:p-2.5 sm:pb-0 ${lifted ? 'shadow-lift' : 'shadow-polaroid'}`}
       style={{ ...tiltStyle(item.id, lifted), '--tape-rotate': `${tiltFor(item.id + 7, 6)}deg` } as CSSProperties}
     >
       <span className="tape" aria-hidden="true" />
-      <div className="aspect-square overflow-hidden bg-neutral-200">
+      <div className="min-h-0 flex-1 overflow-hidden bg-neutral-200">
         <img
           src={mediaUrl(item)}
           alt={item.caption || 'Foto'}
@@ -70,10 +89,36 @@ function Polaroid({ item, textColor, lifted, onEditingChange, onUpdate, onDelete
           <ActionButton label="Ver en grande" onClick={onOpen}>
             <IconExpand width={16} height={16} />
           </ActionButton>
+          <span ref={sizeButtonRef}>
+            <ActionButton label="Cambiar tamaño" onClick={() => setSizeOpen((open) => !open)}>
+              <IconSize width={16} height={16} />
+            </ActionButton>
+          </span>
           <ActionButton label="Quitar foto" onClick={onDelete}>
             <IconTrash width={16} height={16} />
           </ActionButton>
         </ActionBar>
+      )}
+      {sizeOpen && onUpdate && (
+        <div ref={sizePanelRef} {...stopDrag} className="absolute right-0 top-10 z-20 w-44 rounded-lg bg-white p-3 text-ink shadow-lg ring-1 ring-black/10">
+          <p className="mb-2 text-sm font-medium">Tamaño de la foto</p>
+          {([['Columnas', 'span_columns'], ['Filas', 'span_rows']] as const).map(([label, field]) => (
+            <label key={field} className="mb-2 flex items-center justify-between gap-2 text-sm last:mb-0">
+              {label}
+              <input
+                type="number"
+                min={1}
+                max={50}
+                value={item[field]}
+                onChange={(event) => {
+                  const next = Number(event.target.value)
+                  if (Number.isInteger(next) && next >= 1 && next <= 50) onUpdate({ [field]: next })
+                }}
+                className="w-16 rounded border border-line px-2 py-1 text-center"
+              />
+            </label>
+          ))}
+        </div>
       )}
     </figure>
   )

@@ -2,7 +2,10 @@ from pathlib import Path
 
 from conftest import png_bytes, register
 from fastapi.testclient import TestClient
+from sqlalchemy import inspect, text
+from sqlmodel import create_engine
 
+from app import db
 from app.config import get_settings
 
 
@@ -169,6 +172,37 @@ def test_invalid_uploads(client: TestClient) -> None:
     big = client.post(f"/api/books/{bid}/photos", files=[("files", ("a.png", png_bytes(), "image/png"))])
     assert big.status_code == 413
     assert client.get(f"/api/books/{bid}").json()["items"] == []
+
+
+def test_photo_spans_are_persisted_and_notes_stay_single_cell(client: TestClient) -> None:
+    register(client)
+    book_id = client.post("/api/books", json={"title": "Mosaico"}).json()["id"]
+    photo = client.post(
+        f"/api/books/{book_id}/photos", files=[("files", ("a.png", png_bytes(), "image/png"))]
+    ).json()[0]
+    assert (photo["span_columns"], photo["span_rows"]) == (1, 1)
+    response = client.patch(f"/api/items/{photo['id']}", json={"span_columns": 4, "span_rows": 2})
+    assert response.status_code == 200
+    assert (response.json()["span_columns"], response.json()["span_rows"]) == (4, 2)
+    assert client.get(f"/api/books/{book_id}").json()["items"][0]["span_columns"] == 4
+    assert client.patch(f"/api/items/{photo['id']}", json={"span_columns": 0}).status_code == 422
+    assert client.patch(f"/api/items/{photo['id']}", json={"span_rows": 51}).status_code == 422
+    note = client.post(f"/api/books/{book_id}/notes", json={"text": "Hola"}).json()
+    unchanged = client.patch(f"/api/items/{note['id']}", json={"span_columns": 2, "span_rows": 3}).json()
+    assert (unchanged["span_columns"], unchanged["span_rows"]) == (1, 1)
+
+
+def test_existing_sqlite_items_get_default_spans(tmp_path: Path, monkeypatch) -> None:
+    engine = create_engine(f"sqlite:///{tmp_path / 'previous.db'}")
+    with engine.begin() as connection:
+        connection.execute(text("CREATE TABLE item (id INTEGER PRIMARY KEY, book_id INTEGER, type TEXT, position INTEGER)"))
+        connection.execute(text("INSERT INTO item (id, book_id, type, position) VALUES (1, 1, 'photo', 0)"))
+    monkeypatch.setattr(db, "engine", engine)
+    db.init_db()
+    db.init_db()
+    assert {column["name"] for column in inspect(engine).get_columns("item")} >= {"span_columns", "span_rows"}
+    with engine.connect() as connection:
+        assert connection.execute(text("SELECT span_columns, span_rows FROM item WHERE id = 1")).one() == (1, 1)
 
 
 def test_replacing_only_photo_does_not_reuse_cached_media_url(client: TestClient) -> None:
