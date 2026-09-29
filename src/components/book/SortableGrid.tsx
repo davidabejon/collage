@@ -27,6 +27,7 @@ import { ItemView } from './ItemView'
 type Props = {
   items: Item[]
   textColor: string
+  editable: boolean
   trailing?: ReactNode
   onReorder: (items: Item[]) => void
   onUpdate: (id: number, data: ItemUpdate) => void
@@ -46,7 +47,7 @@ function gridColumns() {
   return 2
 }
 
-export function SortableGrid({ items, textColor, trailing, onReorder, onUpdate, onDelete, onOpen, onFrame }: Props) {
+export function SortableGrid({ items, textColor, editable, trailing, onReorder, onUpdate, onDelete, onOpen, onFrame }: Props) {
   const [activeId, setActiveId] = useState<UniqueIdentifier | null>(null)
   const [columns, setColumns] = useState(gridColumns)
   useEffect(() => {
@@ -103,6 +104,7 @@ export function SortableGrid({ items, textColor, trailing, onReorder, onUpdate, 
                 item={item}
                 columns={columns}
                 textColor={textColor}
+                editable={editable}
                 onUpdate={(data) => onUpdate(item.id, data)}
                 onDelete={() => onDelete(item)}
                 onOpen={() => onOpen(item)}
@@ -125,17 +127,18 @@ type SortableItemProps = {
   item: Item
   columns: number
   textColor: string
+  editable: boolean
   onUpdate: (data: ItemUpdate) => void
   onDelete: () => void
   onOpen: () => void
   onFrame: (aspect: number) => void
 }
 
-function SortableItem({ item, columns, textColor, onUpdate, onDelete, onOpen, onFrame }: SortableItemProps) {
+function SortableItem({ item, columns, textColor, editable, onUpdate, onDelete, onOpen, onFrame }: SortableItemProps) {
   const [editing, setEditing] = useState(false)
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
     id: item.id,
-    disabled: editing,
+    disabled: !editable || editing,
   })
   const { onKeyDown, ...pointerListeners } = listeners ?? {}
 
@@ -144,18 +147,18 @@ function SortableItem({ item, columns, textColor, onUpdate, onDelete, onOpen, on
       ref={setNodeRef}
       {...pointerListeners}
       style={{ transform: CSS.Translate.toString(transform), transition, gridColumn: `span ${Math.min(item.span_columns, columns)}`, gridRow: `span ${item.span_rows}` }}
-      className={`group relative touch-manipulation select-none ${isDragging ? 'opacity-25' : ''} ${editing ? '' : 'cursor-grab active:cursor-grabbing'}`}
+      className={`group relative touch-manipulation select-none ${isDragging ? 'opacity-25' : ''} ${editable && !editing ? 'cursor-grab active:cursor-grabbing' : ''}`}
     >
       <ItemView
         item={item}
         textColor={textColor}
         onEditingChange={setEditing}
-        onUpdate={onUpdate}
-        onDelete={onDelete}
+        onUpdate={editable ? onUpdate : undefined}
+        onDelete={editable ? onDelete : undefined}
         onOpen={onOpen}
-        onFrame={onFrame}
+        onFrame={editable ? onFrame : undefined}
       />
-      <button
+      {editable && <button
         ref={setActivatorNodeRef}
         type="button"
         {...attributes}
@@ -164,7 +167,7 @@ function SortableItem({ item, columns, textColor, onUpdate, onDelete, onOpen, on
         className="absolute -left-2 -top-3 z-10 grid size-9 place-items-center rounded-full bg-white/95 text-ink-soft opacity-0 shadow-md ring-1 ring-black/5 transition focus-visible:opacity-100 group-hover:opacity-100 pointer-coarse:hidden"
       >
         <IconGrip width={16} height={16} />
-      </button>
+      </button>}
     </li>
   )
 }

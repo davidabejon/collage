@@ -11,7 +11,7 @@ import { BookSettingsDialog } from '../components/library/BookSettingsDialog'
 import { NOTE_COLORS } from '../lib/design'
 import { Button, IconButton, Spinner } from '../ui/Button'
 import { ConfirmDialog } from '../ui/ConfirmDialog'
-import { IconBack, IconCamera, IconDots, IconNote, IconPalette } from '../ui/icons'
+import { IconBack, IconCamera, IconDots, IconEdit, IconEye, IconNote, IconPalette } from '../ui/icons'
 import { useToast } from '../ui/toast'
 
 const MAX_MB = 15
@@ -25,6 +25,7 @@ export function BookPage() {
   const navigate = useNavigate()
   const [fileInput, setFileInput] = useState<HTMLInputElement | null>(null)
 
+  const [isEditing, setIsEditing] = useState(false)
   const [uploading, setUploading] = useState(0)
   const [styleOpen, setStyleOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
@@ -58,7 +59,15 @@ export function BookPage() {
     })
   }
 
-  const dragging = useFileDrop((files) => void uploadFiles(files))
+  const dragging = useFileDrop((files) => void uploadFiles(files), isEditing)
+
+  const toggleEditing = () => {
+    if (isEditing) {
+      setStyleOpen(false)
+      setSettingsOpen(false)
+    }
+    setIsEditing((editing) => !editing)
+  }
 
   if (book.isPending) {
     return (
@@ -92,7 +101,7 @@ export function BookPage() {
   ]
 
   return (
-    <div className="min-h-dvh pb-28 sm:pb-12">
+    <div className={`min-h-dvh ${isEditing ? 'pb-28 sm:pb-12' : 'pb-12'}`}>
       <header className="sticky top-0 z-30 border-b border-black/5 bg-desk/85 backdrop-blur-md">
         <div className="mx-auto flex h-16 max-w-6xl items-center gap-2 px-2 sm:px-6">
           <IconButton label="Volver a la biblioteca" onClick={() => navigate('/')}>
@@ -102,17 +111,25 @@ export function BookPage() {
             <span aria-hidden="true" className="h-8 w-6 shrink-0 rounded-r-sm rounded-l-[2px] shadow-sm" style={{ backgroundColor: data.cover_color }} />
             <h1 className="truncate font-display text-lg font-semibold">{data.title}</h1>
           </div>
-          <div className="hidden items-center gap-2 sm:flex">
-            {toolbarActions.map((a, i) => (
-              <Button key={a.label} variant={i === 0 ? 'primary' : 'secondary'} onClick={a.onClick} disabled={a.disabled}>
-                {a.icon}
-                {a.label}
-              </Button>
-            ))}
-          </div>
-          <IconButton label="Opciones del libro" onClick={() => setSettingsOpen(true)}>
-            <IconDots />
-          </IconButton>
+          {isEditing && (
+            <div className="hidden items-center gap-2 sm:flex">
+              {toolbarActions.map((a, i) => (
+                <Button key={a.label} variant={i === 0 ? 'primary' : 'secondary'} onClick={a.onClick} disabled={a.disabled}>
+                  {a.icon}
+                  {a.label}
+                </Button>
+              ))}
+            </div>
+          )}
+          <Button variant={isEditing ? 'secondary' : 'primary'} onClick={toggleEditing} className="shrink-0 px-3 sm:px-4">
+            {isEditing ? <IconEye /> : <IconEdit />}
+            {isEditing ? 'Ver álbum' : 'Editar'}
+          </Button>
+          {isEditing && (
+            <IconButton label="Opciones del libro" onClick={() => setSettingsOpen(true)}>
+              <IconDots />
+            </IconButton>
+          )}
         </div>
       </header>
 
@@ -131,11 +148,12 @@ export function BookPage() {
           </div>
 
           {data.items.length === 0 && uploading === 0 ? (
-            <EmptyBook onPhotos={() => fileInput?.click()} onNote={addNote} />
+            <EmptyBook editable={isEditing} onPhotos={() => fileInput?.click()} onNote={addNote} />
           ) : (
             <SortableGrid
               items={data.items}
               textColor={data.text_color}
+              editable={isEditing}
               onReorder={(items) => actions.reorder.mutate(items)}
               onUpdate={(id, patch) => actions.update.mutate({ id, data: patch })}
               onDelete={setDeleting}
@@ -157,7 +175,7 @@ export function BookPage() {
         {uploading > 0 && <p className="sr-only" role="status">Subiendo {uploading} fotos</p>}
       </main>
 
-      <nav
+      {isEditing && <nav
         aria-label="Acciones del libro"
         className="fixed inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-30 flex justify-around rounded-full bg-ink/95 p-1.5 text-paper shadow-lift backdrop-blur sm:hidden"
       >
@@ -173,7 +191,7 @@ export function BookPage() {
             {a.label}
           </button>
         ))}
-      </nav>
+      </nav>}
 
       <input
         ref={setFileInput}
@@ -198,8 +216,8 @@ export function BookPage() {
         </div>
       )}
 
-      <StylePanel book={data} open={styleOpen} onClose={() => setStyleOpen(false)} />
-      <BookSettingsDialog book={settingsOpen ? data : null} onClose={() => setSettingsOpen(false)} onDeleted={() => navigate('/', { replace: true })} />
+      <StylePanel book={data} open={isEditing && styleOpen} onClose={() => setStyleOpen(false)} />
+      <BookSettingsDialog book={isEditing && settingsOpen ? data : null} onClose={() => setSettingsOpen(false)} onDeleted={() => navigate('/', { replace: true })} />
       <Lightbox item={viewing} onClose={() => setViewing(null)} />
       <PhotoCropDialog
         item={framing?.item ?? null}
@@ -225,7 +243,7 @@ export function BookPage() {
   )
 }
 
-function EmptyBook({ onPhotos, onNote }: { onPhotos: () => void; onNote: () => void }) {
+function EmptyBook({ editable, onPhotos, onNote }: { editable: boolean; onPhotos: () => void; onNote: () => void }) {
   return (
     <div className="mx-auto flex max-w-md flex-col items-center py-8 text-center">
       <div aria-hidden="true" className="relative mb-8 h-44 w-56">
@@ -237,20 +255,22 @@ function EmptyBook({ onPhotos, onNote }: { onPhotos: () => void; onNote: () => v
         </div>
       </div>
       <p className="font-hand text-4xl leading-none">Tu libro está en blanco</p>
-      <p className="mt-2 opacity-70">Pega tu primera foto o deja una nota.</p>
-      <div className="mt-6 flex flex-wrap justify-center gap-2">
-        <Button onClick={onPhotos}>
-          <IconCamera /> Añadir fotos
-        </Button>
-        <Button variant="secondary" onClick={onNote}>
-          <IconNote /> Nuevo post-it
-        </Button>
-      </div>
+      <p className="mt-2 opacity-70">{editable ? 'Pega tu primera foto o deja una nota.' : 'Este libro todavía está en blanco.'}</p>
+      {editable && (
+        <div className="mt-6 flex flex-wrap justify-center gap-2">
+          <Button onClick={onPhotos}>
+            <IconCamera /> Añadir fotos
+          </Button>
+          <Button variant="secondary" onClick={onNote}>
+            <IconNote /> Nuevo post-it
+          </Button>
+        </div>
+      )}
     </div>
   )
 }
 
-function useFileDrop(onDrop: (files: FileList) => void) {
+function useFileDrop(onDrop: (files: FileList) => void, enabled: boolean) {
   const [dragging, setDragging] = useState(false)
   const handler = useRef(onDrop)
   useEffect(() => {
@@ -258,6 +278,7 @@ function useFileDrop(onDrop: (files: FileList) => void) {
   })
 
   useEffect(() => {
+    if (!enabled) return
     let depth = 0
     const hasFiles = (e: DragEvent) => e.dataTransfer?.types.includes('Files') ?? false
     const enter = (e: DragEvent) => {
@@ -290,7 +311,7 @@ function useFileDrop(onDrop: (files: FileList) => void) {
       window.removeEventListener('dragover', over)
       window.removeEventListener('drop', drop)
     }
-  }, [])
+  }, [enabled])
 
   return dragging
 }

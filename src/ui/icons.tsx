@@ -56,6 +56,20 @@ export const IconBack = (p: IconProps) => (
   </Icon>
 )
 
+export const IconEdit = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="m4 16.5-.8 4.3 4.3-.8L19.3 8.2a2 2 0 0 0-2.8-2.8z" />
+    <path d="m14.5 7.5 2.8 2.8" />
+  </Icon>
+)
+
+export const IconEye = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6z" />
+    <circle cx="12" cy="12" r="2.5" />
+  </Icon>
+)
+
 export const IconDots = (p: IconProps) => (
   <Icon {...p}>
     <circle cx="5" cy="12" r="1.2" fill="currentColor" />

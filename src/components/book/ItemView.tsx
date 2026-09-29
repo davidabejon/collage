@@ -126,6 +126,14 @@ function Polaroid({ item, textColor, lifted, onEditingChange, onUpdate, onDelete
       <span className="tape" aria-hidden="true" />
       <div ref={frameRef} className="relative min-h-0 flex-1 overflow-hidden bg-neutral-200">
         <FramedPhoto item={item} />
+        {!onDelete && onOpen && (
+          <button
+            type="button"
+            aria-label="Ver foto en grande"
+            onClick={onOpen}
+            className="absolute inset-0 z-[1] cursor-zoom-in focus-visible:outline-2 focus-visible:outline-accent"
+          />
+        )}
       </div>
       <figcaption className="flex h-11 min-w-0 items-center gap-1 px-1 sm:h-13">
         {onUpdate ? (
