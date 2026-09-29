@@ -1,4 +1,5 @@
 import io
+import shutil
 import uuid
 import warnings
 from pathlib import Path
@@ -74,6 +75,22 @@ async def store_image(upload: UploadFile, user_id: int) -> tuple[str, str]:
     _save_webp(img, FULL_MAX_SIDE, _media_root() / full_rel, quality=88)
     _save_webp(img, THUMB_MAX_SIDE, _media_root() / thumb_rel, quality=80)
     return full_rel, thumb_rel
+
+
+def copy_image(full_rel: str, thumb_rel: str, user_id: int) -> tuple[str, str]:
+    full_source = resolve_media(full_rel)
+    thumb_source = resolve_media(thumb_rel)
+    user_dir = _media_root() / str(user_id)
+    user_dir.mkdir(parents=True, exist_ok=True)
+    name = uuid.uuid4().hex
+    new_paths = (f"{user_id}/{name}.webp", f"{user_id}/{name}_thumb.webp")
+    try:
+        shutil.copyfile(full_source, _media_root() / new_paths[0])
+        shutil.copyfile(thumb_source, _media_root() / new_paths[1])
+    except OSError:
+        delete_media(*new_paths)
+        raise
+    return new_paths
 
 
 def resolve_media(rel_path: str) -> Path:

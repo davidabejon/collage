@@ -9,6 +9,7 @@ export type BookSummary = {
   bg_color: string
   text_color: string
   cover_color: string
+  cover_image: boolean
   created_at: string
   updated_at: string
   item_count: number

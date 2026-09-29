@@ -15,6 +15,13 @@ export const booksApi = {
   get: (id: number) => request<BookDetail>(`/books/${id}`),
   create: (title: string, cover_color: string, collaborator_username?: string) =>
     request<BookSummary>('/books', { method: 'POST', body: json({ title, cover_color, collaborator_username }) }),
+  uploadCover: (id: number, file: File) => {
+    const form = new FormData()
+    form.append('file', file)
+    return request<BookSummary>(`/books/${id}/cover`, { method: 'POST', body: form })
+  },
+  useAlbumPhotoAsCover: (bookId: number, itemId: number) =>
+    request<BookSummary>(`/books/${bookId}/cover/from-item/${itemId}`, { method: 'POST' }),
   addCollaborator: (id: number, username: string) =>
     request<BookSummary>(`/books/${id}/collaborators`, { method: 'POST', body: json({ username }) }),
   update: (id: number, data: BookUpdate) =>
@@ -30,6 +37,9 @@ export const booksApi = {
   addNote: (id: number, note_color: string, text = '') =>
     request<Item>(`/books/${id}/notes`, { method: 'POST', body: json({ text, note_color }) }),
 }
+
+export const bookCoverUrl = (book: Pick<BookSummary, 'id' | 'updated_at'>, size: 'thumb' | 'full' = 'thumb') =>
+  `/api/books/${book.id}/cover?size=${size}&v=${encodeURIComponent(book.updated_at)}`
 
 export const itemsApi = {
   update: (id: number, data: ItemUpdate) =>

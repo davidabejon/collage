@@ -26,6 +26,11 @@ def init_db() -> None:
 
     SQLModel.metadata.create_all(engine)
     if engine.dialect.name == "sqlite":
+        book_columns = {column["name"] for column in inspect(engine).get_columns("book")}
+        with engine.begin() as connection:
+            for name in ("cover_image_path", "cover_thumb_path"):
+                if name not in book_columns:
+                    connection.execute(text(f"ALTER TABLE book ADD COLUMN {name} VARCHAR"))
         columns = {column["name"] for column in inspect(engine).get_columns("item")}
         with engine.begin() as connection:
             for name in ("span_columns", "span_rows"):

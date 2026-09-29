@@ -53,9 +53,65 @@ def test_book_crud_and_colors(client: TestClient) -> None:
     assert client.get("/api/books").json() == []
 
 
+def test_book_cover_upload_replace_and_delete(client: TestClient) -> None:
+    register(client)
+    book = client.post("/api/books", json={"title": "Portada"}).json()
+    cover_url = f"/api/books/{book['id']}/cover"
+
+    uploaded = client.post(cover_url, files={"file": ("cover.png", png_bytes(), "image/png")})
+    assert uploaded.status_code == 200
+    assert uploaded.json()["cover_image"] is True
+    assert client.get("/api/books").json()[0]["cover_image"] is True
+    first_image = client.get(cover_url)
+    assert first_image.status_code == 200
+    assert first_image.headers["content-type"] == "image/webp"
+
+    replaced = client.post(
+        cover_url, files={"file": ("replacement.png", png_bytes((32, 32)), "image/png")}
+    )
+    assert replaced.status_code == 200
+    assert client.get(cover_url).content != first_image.content
+    assert len(list(Path(get_settings().media_dir).rglob("*.webp"))) == 2
+
+    assert client.delete(f"/api/books/{book['id']}").status_code == 204
+    assert list(Path(get_settings().media_dir).rglob("*.webp")) == []
+
+
+def test_book_cover_can_use_photo_from_same_album(client: TestClient) -> None:
+    register(client)
+    book = client.post("/api/books", json={"title": "Recuerdos"}).json()
+    photo = client.post(
+        f"/api/books/{book['id']}/photos", files=[("files", ("photo.png", png_bytes(), "image/png"))]
+    ).json()[0]
+    original = client.get(f"/api/media/{photo['id']}?size=full").content
+
+    selected = client.post(f"/api/books/{book['id']}/cover/from-item/{photo['id']}")
+    assert selected.status_code == 200
+    assert selected.json()["cover_image"] is True
+    assert client.get(f"/api/books/{book['id']}/cover?size=full").content == original
+
+    assert client.delete(f"/api/items/{photo['id']}").status_code == 204
+    assert client.get(f"/api/books/{book['id']}/cover?size=full").content == original
+    assert client.post(f"/api/books/{book['id']}/cover/from-item/{photo['id']}").status_code == 404
+
+
+def test_book_cover_cannot_use_photo_from_another_album(client: TestClient) -> None:
+    register(client)
+    first = client.post("/api/books", json={"title": "Uno"}).json()
+    second = client.post("/api/books", json={"title": "Dos"}).json()
+    photo = client.post(
+        f"/api/books/{first['id']}/photos", files=[("files", ("photo.png", png_bytes(), "image/png"))]
+    ).json()[0]
+    result = client.post(f"/api/books/{second['id']}/cover/from-item/{photo['id']}")
+    assert result.status_code == 404
+
+
 def test_other_users_cannot_access(client: TestClient) -> None:
     register(client, "ana")
     book = client.post("/api/books", json={"title": "Privado"}).json()
+    client.post(
+        f"/api/books/{book['id']}/cover", files={"file": ("cover.png", png_bytes(), "image/png")}
+    )
     photo = client.post(
         f"/api/books/{book['id']}/photos", files=[("files", ("a.png", png_bytes(), "image/png"))]
     ).json()[0]
@@ -63,6 +119,7 @@ def test_other_users_cannot_access(client: TestClient) -> None:
 
     register(client, "eva")
     assert client.get(f"/api/books/{book['id']}").status_code == 404
+    assert client.get(f"/api/books/{book['id']}/cover").status_code == 404
     assert client.patch(f"/api/books/{book['id']}", json={"title": "x"}).status_code == 404
     assert client.delete(f"/api/books/{book['id']}").status_code == 404
     assert client.get(f"/api/media/{photo['id']}").status_code == 404
@@ -234,6 +291,10 @@ def test_photo_caption_alignment_is_saved(client: TestClient) -> None:
 def test_existing_sqlite_items_get_default_spans_and_framing(tmp_path: Path, monkeypatch) -> None:
     engine = create_engine(f"sqlite:///{tmp_path / 'previous.db'}")
     with engine.begin() as connection:
+        connection.execute(text(
+            "CREATE TABLE book (id INTEGER PRIMARY KEY, owner_id INTEGER, title TEXT, bg_color TEXT, "
+            "text_color TEXT, cover_color TEXT, created_at DATETIME, updated_at DATETIME)"
+        ))
         connection.execute(text("CREATE TABLE item (id INTEGER PRIMARY KEY, book_id INTEGER, type TEXT, position INTEGER)"))
         connection.execute(text("INSERT INTO item (id, book_id, type, position) VALUES (1, 1, 'photo', 0)"))
     monkeypatch.setattr(db, "engine", engine)
@@ -241,6 +302,9 @@ def test_existing_sqlite_items_get_default_spans_and_framing(tmp_path: Path, mon
     db.init_db()
     assert {column["name"] for column in inspect(engine).get_columns("item")} >= {
         "span_columns", "span_rows", "focal_x", "focal_y", "photo_zoom", "caption_align"
+    }
+    assert {column["name"] for column in inspect(engine).get_columns("book")} >= {
+        "cover_image_path", "cover_thumb_path"
     }
     with engine.connect() as connection:
         assert connection.execute(text("SELECT span_columns, span_rows FROM item WHERE id = 1")).one() == (1, 1)

@@ -21,6 +21,24 @@ export function useCreateBook() {
   })
 }
 
+export function useUploadBookCover() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (choice: { bookId: number; file: File } | { bookId: number; itemId: number }) =>
+      'file' in choice
+        ? booksApi.uploadCover(choice.bookId, choice.file)
+        : booksApi.useAlbumPhotoAsCover(choice.bookId, choice.itemId),
+    onSuccess: (updatedBook) => {
+      qc.setQueryData<BookSummary[]>(keys.books, (current) =>
+        current?.map((book) => (book.id === updatedBook.id ? updatedBook : book)),
+      )
+      qc.setQueryData<BookDetail>(keys.book(updatedBook.id), (current) =>
+        current ? { ...current, ...updatedBook } : current,
+      )
+    },
+  })
+}
+
 export function useAddCollaborator(id: number) {
   const qc = useQueryClient()
   return useMutation({

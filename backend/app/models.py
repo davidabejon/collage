@@ -25,6 +25,8 @@ class Book(SQLModel, table=True):
     bg_color: str = "#f5efe3"
     text_color: str = "#2b2622"
     cover_color: str = "#8c3b2e"
+    cover_image_path: str | None = None
+    cover_thumb_path: str | None = None
     created_at: datetime = Field(default_factory=utcnow)
     updated_at: datetime = Field(default_factory=utcnow)
 

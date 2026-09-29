@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import type { BookSummary } from '../../api/types'
-import { useAddCollaborator, useBook, useDeleteBook, useUpdateBook } from '../../api/queries'
+import { bookCoverUrl, mediaUrl } from '../../api/endpoints'
+import { useAddCollaborator, useBook, useDeleteBook, useUpdateBook, useUploadBookCover } from '../../api/queries'
 import { useMe } from '../../auth/useAuth'
 import { Button } from '../../ui/Button'
 import { ConfirmDialog } from '../../ui/ConfirmDialog'
@@ -26,12 +27,16 @@ export function BookSettingsDialog({ book, onClose, onDeleted }: Props) {
 function Content({ book, onClose, onDeleted }: { book: BookSummary; onClose: () => void; onDeleted?: () => void }) {
   const current = useBook(book.id)
   const update = useUpdateBook(book.id)
+  const uploadCover = useUploadBookCover()
   const addCollaborator = useAddCollaborator(book.id)
   const remove = useDeleteBook()
   const { data: user } = useMe()
   const toast = useToast()
   const [confirming, setConfirming] = useState(false)
   const [username, setUsername] = useState('')
+  const albumPhotos = (current.data?.items ?? [])
+    .filter((item) => item.type === 'photo')
+    .map((item, index) => ({ id: item.id, url: mediaUrl(item), label: item.caption.trim() || `Foto ${index + 1}` }))
 
   const addMember = (event: FormEvent) => {
     event.preventDefault()
@@ -49,10 +54,23 @@ function Content({ book, onClose, onDeleted }: { book: BookSummary; onClose: () 
       <BookForm
         initialTitle={book.title}
         initialCover={book.cover_color}
+        initialCoverImage={book.cover_image ? bookCoverUrl(book) : undefined}
+        albumPhotos={albumPhotos}
         submitLabel="Guardar"
-        busy={update.isPending}
-        error={update.error?.message}
-        onSubmit={(title, cover_color) => update.mutate({ title, cover_color }, { onSuccess: onClose })}
+        busy={update.isPending || uploadCover.isPending}
+        error={uploadCover.error?.message ?? update.error?.message}
+        onSubmit={(title, cover_color, _collaborator, coverImage, coverItemId) => update.mutate({ title, cover_color }, {
+          onSuccess: () => {
+            if (!coverImage && coverItemId === undefined) {
+              onClose()
+              return
+            }
+            const choice = coverImage
+              ? { bookId: book.id, file: coverImage }
+              : { bookId: book.id, itemId: coverItemId! }
+            uploadCover.mutate(choice, { onSuccess: onClose })
+          },
+        })}
       />
       <section className="mt-6 border-t border-line pt-5">
         <h3 className="font-display text-lg font-semibold">Personas con acceso</h3>

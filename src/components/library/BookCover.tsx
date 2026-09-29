@@ -1,4 +1,5 @@
 import { Link } from 'react-router'
+import { bookCoverUrl } from '../../api/endpoints'
 import type { BookSummary } from '../../api/types'
 import { tiltFor } from '../../lib/design'
 import { IconDots } from '../../ui/icons'
@@ -14,10 +15,12 @@ export function BookCover({ book, onEdit }: Props) {
         className="relative block aspect-[3/4] origin-left rounded-l-[4px] rounded-r-xl shadow-book transition duration-300 ease-out group-hover:-translate-y-1 group-hover:[transform:rotateY(-8deg)] focus-visible:-translate-y-1"
         style={{ backgroundColor: book.cover_color }}
       >
+        {book.cover_image && <img src={bookCoverUrl(book)} alt="" className="absolute inset-0 size-full rounded-l-[4px] rounded-r-xl object-cover" />}
         {/* spine, page edges and cloth sheen */}
         <span className="absolute inset-y-0 left-0 w-4 rounded-l-[4px] bg-linear-to-r from-black/35 via-black/10 to-white/10" />
         <span className="absolute inset-y-2 -right-1 w-1.5 rounded-r-sm bg-[repeating-linear-gradient(0deg,#f4ecdd_0_2px,#e2d5bd_2px_3px)]" />
         <span className="absolute inset-0 rounded-r-xl bg-linear-to-br from-white/15 via-transparent to-black/20" />
+        <span aria-hidden="true" className="absolute inset-x-0 bottom-0 h-16 rounded-b-xl bg-linear-to-t from-black/75 via-black/35 to-transparent" />
 
         <span
           className="absolute left-7 right-4 top-[18%] flex min-h-20 flex-col justify-center bg-paper px-3 py-2 text-center shadow-sm"
@@ -28,7 +31,7 @@ export function BookCover({ book, onEdit }: Props) {
           </span>
         </span>
 
-        <span className="absolute bottom-3 left-7 right-3 text-xs font-medium text-white/80">
+        <span className="absolute bottom-3 left-7 right-3 z-[1] text-xs font-medium text-white">
           {count === 0 ? 'En blanco' : `${count} ${count === 1 ? 'recuerdo' : 'recuerdos'}`}
         </span>
       </Link>

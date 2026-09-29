@@ -44,6 +44,7 @@ class BookSummary(BaseModel):
     bg_color: str
     text_color: str
     cover_color: str
+    cover_image: bool = False
     created_at: datetime
     updated_at: datetime
     item_count: int = 0

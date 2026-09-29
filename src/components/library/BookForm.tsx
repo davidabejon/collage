@@ -1,36 +1,45 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { Button } from '../../ui/Button'
 import { ColorField } from '../../ui/ColorField'
+import { IconCamera } from '../../ui/icons'
 import { COVER_COLORS } from '../../lib/design'
+
+type AlbumPhoto = { id: number; url: string; label: string }
 
 type Props = {
   initialTitle?: string
   initialCover?: string
+  initialCoverImage?: string
+  albumPhotos?: AlbumPhoto[]
   allowCollaborator?: boolean
   submitLabel: string
   busy?: boolean
   error?: string
-  onSubmit: (title: string, cover: string, collaborator?: string) => void
+  onSubmit: (title: string, cover: string, collaborator?: string, coverImage?: File, coverItemId?: number) => void
 }
 
-export function BookForm({ initialTitle = '', initialCover = COVER_COLORS[0], allowCollaborator = false, submitLabel, busy, error, onSubmit }: Props) {
+export function BookForm({ initialTitle = '', initialCover = COVER_COLORS[0], initialCoverImage, albumPhotos = [], allowCollaborator = false, submitLabel, busy, error, onSubmit }: Props) {
   const [title, setTitle] = useState(initialTitle)
   const [cover, setCover] = useState(initialCover)
   const [collaborator, setCollaborator] = useState('')
+  const [selectedCover, setSelectedCover] = useState<{ file: File; preview: string } | null>(null)
+  const [selectedAlbumPhoto, setSelectedAlbumPhoto] = useState<number | null>(null)
+  const coverPreview = selectedCover?.preview ?? albumPhotos.find((photo) => photo.id === selectedAlbumPhoto)?.url ?? initialCoverImage
+
+  useEffect(() => () => {
+    if (selectedCover) URL.revokeObjectURL(selectedCover.preview)
+  }, [selectedCover])
 
   const submit = (e: FormEvent) => {
     e.preventDefault()
-    if (title.trim()) onSubmit(title.trim(), cover, collaborator.trim() || undefined)
+    if (title.trim()) onSubmit(title.trim(), cover, collaborator.trim() || undefined, selectedCover?.file, selectedAlbumPhoto ?? undefined)
   }
 
   return (
     <form onSubmit={submit} className="space-y-5">
       <div className="flex items-center gap-4">
-        <div
-          aria-hidden="true"
-          className="relative h-24 w-18 shrink-0 rounded-l-[3px] rounded-r-lg shadow-book transition-colors"
-          style={{ backgroundColor: cover }}
-        >
+        <div aria-hidden="true" className="relative h-24 w-18 shrink-0 overflow-hidden rounded-l-[3px] rounded-r-lg shadow-book transition-colors" style={{ backgroundColor: cover }}>
+          {coverPreview && <img src={coverPreview} alt="" className="absolute inset-0 size-full object-cover" />}
           <span className="absolute inset-y-0 left-0 w-2 rounded-l-[3px] bg-black/25" />
           <span className="absolute left-3 right-2 top-5 h-8 bg-paper" />
         </div>
@@ -51,6 +60,51 @@ export function BookForm({ initialTitle = '', initialCover = COVER_COLORS[0], al
       </div>
 
       <ColorField label="Color de la tapa" value={cover} colors={COVER_COLORS} onChange={setCover} />
+
+      {albumPhotos.length > 0 && (
+        <fieldset>
+          <legend className="text-sm font-medium text-ink-soft">Elegir una foto del álbum</legend>
+          <div className="mt-2 grid max-h-44 grid-cols-4 gap-2 overflow-y-auto pr-1 sm:grid-cols-5">
+            {albumPhotos.map((photo) => (
+              <button
+                key={photo.id}
+                type="button"
+                aria-label={`Usar ${photo.label} como portada`}
+                aria-pressed={selectedAlbumPhoto === photo.id}
+                onClick={() => {
+                  setSelectedCover(null)
+                  setSelectedAlbumPhoto(photo.id)
+                }}
+                className={`aspect-square overflow-hidden rounded-md ring-2 transition ${selectedAlbumPhoto === photo.id ? 'ring-accent' : 'ring-transparent hover:ring-line'}`}
+              >
+                <img src={photo.url} alt="" loading="lazy" className="size-full object-cover" />
+              </button>
+            ))}
+          </div>
+        </fieldset>
+      )}
+
+      <div>
+        <label htmlFor="book-cover-image" className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-full bg-white/80 px-4 text-sm font-medium text-ink ring-1 ring-line transition hover:bg-white">
+          <IconCamera width={18} height={18} />
+          {selectedCover || selectedAlbumPhoto !== null || initialCoverImage ? 'Cambiar imagen de portada' : 'Elegir imagen de portada'}
+        </label>
+        <input
+          id="book-cover-image"
+          type="file"
+          accept="image/*"
+          className="sr-only"
+          onChange={(event) => {
+            const file = event.target.files?.[0]
+            if (file) {
+              setSelectedAlbumPhoto(null)
+              setSelectedCover({ file, preview: URL.createObjectURL(file) })
+            }
+            event.target.value = ''
+          }}
+        />
+        {selectedCover && <p className="mt-1 truncate text-xs text-ink-soft">{selectedCover.file.name}</p>}
+      </div>
 
       {allowCollaborator && (
         <div>

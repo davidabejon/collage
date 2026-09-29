@@ -36,7 +36,7 @@ export function useAuthActions() {
   const logout = useMutation({
     mutationFn: authApi.logout,
     onSettled: () => {
-      qc.clear()
+      qc.removeQueries({ predicate: (query) => query.queryKey[0] !== ME_KEY[0] })
       qc.setQueryData(ME_KEY, null)
     },
   })

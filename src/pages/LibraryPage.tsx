@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router'
 import { useBooks, useCreateBook } from '../api/queries'
+import { useUploadBookCover } from '../api/queries'
 import type { BookSummary } from '../api/types'
 import { useAuthActions, useMe } from '../auth/useAuth'
 import { BookCover } from '../components/library/BookCover'
@@ -9,12 +10,15 @@ import { BookSettingsDialog } from '../components/library/BookSettingsDialog'
 import { Button, IconButton } from '../ui/Button'
 import { IconLogout, IconPlus } from '../ui/icons'
 import { Modal } from '../ui/Modal'
+import { useToast } from '../ui/toast'
 
 export function LibraryPage() {
   const { data: user } = useMe()
   const { logout } = useAuthActions()
   const books = useBooks()
   const create = useCreateBook()
+  const uploadCover = useUploadBookCover()
+  const toast = useToast()
   const navigate = useNavigate()
   const [creating, setCreating] = useState(false)
   const [editing, setEditing] = useState<BookSummary | null>(null)
@@ -30,7 +34,11 @@ export function LibraryPage() {
           <Button className="hidden sm:inline-flex" onClick={() => setCreating(true)}>
             <IconPlus width={18} height={18} /> Nuevo libro
           </Button>
-          <IconButton label="Cerrar sesión" onClick={() => logout.mutate()}>
+          <IconButton
+            label="Cerrar sesión"
+            disabled={logout.isPending}
+            onClick={() => logout.mutate(undefined, { onSettled: () => navigate('/login', { replace: true }) })}
+          >
             <IconLogout />
           </IconButton>
         </div>
@@ -89,15 +97,31 @@ export function LibraryPage() {
           <BookForm
             submitLabel="Crear libro"
             allowCollaborator
-            busy={create.isPending}
+            busy={create.isPending || uploadCover.isPending}
             error={create.error?.message}
-            onSubmit={(title, cover, collaborator) =>
+            onSubmit={(title, cover, collaborator, coverImage) =>
               create.mutate(
                 { title, cover, collaborator },
                 {
                   onSuccess: (book) => {
-                    setCreating(false)
-                    navigate(`/books/${book.id}`)
+                    const openBook = () => {
+                      setCreating(false)
+                      navigate(`/books/${book.id}`)
+                    }
+                    if (!coverImage) {
+                      openBook()
+                      return
+                    }
+                    uploadCover.mutate(
+                      { bookId: book.id, file: coverImage },
+                      {
+                        onSuccess: openBook,
+                        onError: (error) => {
+                          toast(`El libro se creó, pero no se pudo guardar la portada: ${error.message}`, 'error')
+                          openBook()
+                        },
+                      },
+                    )
                   },
                 },
               )
