@@ -32,6 +32,7 @@ type Props = {
   onUpdate: (id: number, data: ItemUpdate) => void
   onDelete: (item: Item) => void
   onOpen: (item: Item) => void
+  onFrame: (item: Item, aspect: number) => void
 }
 
 const kindOf = (items: Item[], id: UniqueIdentifier) => (items.find((i) => i.id === id)?.type === 'note' ? 'nota' : 'foto')
@@ -45,7 +46,7 @@ function gridColumns() {
   return 2
 }
 
-export function SortableGrid({ items, textColor, trailing, onReorder, onUpdate, onDelete, onOpen }: Props) {
+export function SortableGrid({ items, textColor, trailing, onReorder, onUpdate, onDelete, onOpen, onFrame }: Props) {
   const [activeId, setActiveId] = useState<UniqueIdentifier | null>(null)
   const [columns, setColumns] = useState(gridColumns)
   useEffect(() => {
@@ -105,6 +106,7 @@ export function SortableGrid({ items, textColor, trailing, onReorder, onUpdate, 
                 onUpdate={(data) => onUpdate(item.id, data)}
                 onDelete={() => onDelete(item)}
                 onOpen={() => onOpen(item)}
+                onFrame={(aspect) => onFrame(item, aspect)}
               />
             ))}
             {trailing}
@@ -126,9 +128,10 @@ type SortableItemProps = {
   onUpdate: (data: ItemUpdate) => void
   onDelete: () => void
   onOpen: () => void
+  onFrame: (aspect: number) => void
 }
 
-function SortableItem({ item, columns, textColor, onUpdate, onDelete, onOpen }: SortableItemProps) {
+function SortableItem({ item, columns, textColor, onUpdate, onDelete, onOpen, onFrame }: SortableItemProps) {
   const [editing, setEditing] = useState(false)
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
     id: item.id,
@@ -150,6 +153,7 @@ function SortableItem({ item, columns, textColor, onUpdate, onDelete, onOpen }: 
         onUpdate={onUpdate}
         onDelete={onDelete}
         onOpen={onOpen}
+        onFrame={onFrame}
       />
       <button
         ref={setActivatorNodeRef}

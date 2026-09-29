@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { mediaUrl } from '../../api/endpoints'
 import type { Item, ItemUpdate } from '../../api/types'
 import { NOTE_COLORS, readableOn, tiltFor } from '../../lib/design'
-import { IconExpand, IconPalette, IconSize, IconTrash } from '../../ui/icons'
+import { IconCrop, IconExpand, IconPalette, IconSize, IconTrash } from '../../ui/icons'
 import { ActionBar, ActionButton, InlineText } from './ItemControls'
 import { stopDrag } from './stopDrag'
 
@@ -14,6 +14,7 @@ export type ItemViewProps = {
   onUpdate?: (data: ItemUpdate) => void
   onDelete?: () => void
   onOpen?: () => void
+  onFrame?: (aspect: number) => void
 }
 
 const tiltStyle = (id: number, lifted?: boolean) => ({
@@ -23,6 +24,44 @@ const tiltStyle = (id: number, lifted?: boolean) => ({
 
 export function ItemView(props: ItemViewProps) {
   return props.item.type === 'photo' ? <Polaroid {...props} /> : <PostIt {...props} />
+}
+
+function FramedPhoto({ item }: { item: Item }) {
+  const frameRef = useRef<HTMLDivElement>(null)
+  const [frame, setFrame] = useState({ width: 0, height: 0 })
+  const [image, setImage] = useState({ width: 0, height: 0 })
+
+  useEffect(() => {
+    const frameNode = frameRef.current
+    if (!frameNode) return
+    const observer = new ResizeObserver(([entry]) => {
+      setFrame({ width: entry.contentRect.width, height: entry.contentRect.height })
+    })
+    observer.observe(frameNode)
+    return () => observer.disconnect()
+  }, [])
+
+  const ready = frame.width > 0 && frame.height > 0 && image.width > 0 && image.height > 0
+  const scale = ready ? Math.max(frame.width / image.width, frame.height / image.height) * item.photo_zoom : 1
+  const width = image.width * scale
+  const height = image.height * scale
+  const left = Math.min(0, Math.max(frame.width - width, frame.width / 2 - item.focal_x * width))
+  const top = Math.min(0, Math.max(frame.height - height, frame.height / 2 - item.focal_y * height))
+
+  return (
+    <div ref={frameRef} className="size-full overflow-hidden">
+      <img
+        src={mediaUrl(item)}
+        alt={item.caption || 'Foto'}
+        loading="lazy"
+        decoding="async"
+        draggable={false}
+        onLoad={(event) => setImage({ width: event.currentTarget.naturalWidth, height: event.currentTarget.naturalHeight })}
+        className={`absolute max-w-none animate-[develop_1.2s_ease-out] select-none [-webkit-touch-callout:none] ${ready ? '' : 'size-full object-cover'}`}
+        style={ready ? { width, height, left, top } : undefined}
+      />
+    </div>
+  )
 }
 
 function ItemSizeControls({ item, onUpdate }: { item: Item; onUpdate: (data: ItemUpdate) => void }) {
@@ -76,7 +115,8 @@ function ItemSizeControls({ item, onUpdate }: { item: Item; onUpdate: (data: Ite
   )
 }
 
-function Polaroid({ item, textColor, lifted, onEditingChange, onUpdate, onDelete, onOpen }: ItemViewProps) {
+function Polaroid({ item, textColor, lifted, onEditingChange, onUpdate, onDelete, onOpen, onFrame }: ItemViewProps) {
+  const frameRef = useRef<HTMLDivElement>(null)
   const color = readableOn('#ffffff', textColor)
   return (
     <figure
@@ -84,15 +124,8 @@ function Polaroid({ item, textColor, lifted, onEditingChange, onUpdate, onDelete
       style={{ ...tiltStyle(item.id, lifted), '--tape-rotate': `${tiltFor(item.id + 7, 6)}deg` } as CSSProperties}
     >
       <span className="tape" aria-hidden="true" />
-      <div className="min-h-0 flex-1 overflow-hidden bg-neutral-200">
-        <img
-          src={mediaUrl(item)}
-          alt={item.caption || 'Foto'}
-          loading="lazy"
-          decoding="async"
-          draggable={false}
-          className="size-full animate-[develop_1.2s_ease-out] select-none object-cover [-webkit-touch-callout:none]"
-        />
+      <div ref={frameRef} className="relative min-h-0 flex-1 overflow-hidden bg-neutral-200">
+        <FramedPhoto item={item} />
       </div>
       <figcaption className="flex h-11 items-center justify-center px-1 sm:h-13">
         {onUpdate ? (
@@ -121,6 +154,14 @@ function Polaroid({ item, textColor, lifted, onEditingChange, onUpdate, onDelete
           <ActionButton label="Ver en grande" onClick={onOpen}>
             <IconExpand width={16} height={16} />
           </ActionButton>
+          {onFrame && (
+            <ActionButton label="Encuadrar foto" onClick={() => {
+              const frame = frameRef.current
+              if (frame?.clientWidth && frame.clientHeight) onFrame(frame.clientWidth / frame.clientHeight)
+            }}>
+              <IconCrop width={16} height={16} />
+            </ActionButton>
+          )}
           {onUpdate && <ItemSizeControls item={item} onUpdate={onUpdate} />}
           <ActionButton label="Quitar foto" onClick={onDelete}>
             <IconTrash width={16} height={16} />

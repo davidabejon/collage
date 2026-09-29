@@ -83,6 +83,12 @@ export const IconSize = (p: IconProps) => (
   </Icon>
 )
 
+export const IconCrop = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M4 3v14a3 3 0 0 0 3 3h14M3 4h14a3 3 0 0 1 3 3v14" />
+  </Icon>
+)
+
 export const IconClose = (p: IconProps) => (
   <Icon {...p}>
     <path d="M6 6l12 12M18 6L6 18" />

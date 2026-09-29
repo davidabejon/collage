@@ -197,7 +197,25 @@ def test_item_spans_are_persisted_for_photos_and_notes(client: TestClient) -> No
     assert client.patch(f"/api/items/{note['id']}", json={"span_rows": 0}).status_code == 422
 
 
-def test_existing_sqlite_items_get_default_spans(tmp_path: Path, monkeypatch) -> None:
+def test_photo_framing_is_persisted_and_restricted_to_photos(client: TestClient) -> None:
+    register(client)
+    book_id = client.post("/api/books", json={"title": "Encuadre"}).json()["id"]
+    photo = client.post(
+        f"/api/books/{book_id}/photos", files=[("files", ("a.png", png_bytes(), "image/png"))]
+    ).json()[0]
+    assert (photo["focal_x"], photo["focal_y"], photo["photo_zoom"]) == (0.5, 0.5, 1)
+    updated = client.patch(f"/api/items/{photo['id']}", json={"focal_x": 0.27, "focal_y": 0.83, "photo_zoom": 2.4})
+    assert updated.status_code == 200
+    assert (updated.json()["focal_x"], updated.json()["focal_y"], updated.json()["photo_zoom"]) == (0.27, 0.83, 2.4)
+    assert client.get(f"/api/books/{book_id}").json()["items"][0]["photo_zoom"] == 2.4
+    assert client.patch(f"/api/items/{photo['id']}", json={"focal_x": -0.1}).status_code == 422
+    assert client.patch(f"/api/items/{photo['id']}", json={"photo_zoom": 5}).status_code == 422
+    note = client.post(f"/api/books/{book_id}/notes", json={"text": "Hola"}).json()
+    unchanged = client.patch(f"/api/items/{note['id']}", json={"focal_x": 0.1, "photo_zoom": 3}).json()
+    assert (unchanged["focal_x"], unchanged["photo_zoom"]) == (0.5, 1)
+
+
+def test_existing_sqlite_items_get_default_spans_and_framing(tmp_path: Path, monkeypatch) -> None:
     engine = create_engine(f"sqlite:///{tmp_path / 'previous.db'}")
     with engine.begin() as connection:
         connection.execute(text("CREATE TABLE item (id INTEGER PRIMARY KEY, book_id INTEGER, type TEXT, position INTEGER)"))
@@ -205,9 +223,12 @@ def test_existing_sqlite_items_get_default_spans(tmp_path: Path, monkeypatch) ->
     monkeypatch.setattr(db, "engine", engine)
     db.init_db()
     db.init_db()
-    assert {column["name"] for column in inspect(engine).get_columns("item")} >= {"span_columns", "span_rows"}
+    assert {column["name"] for column in inspect(engine).get_columns("item")} >= {
+        "span_columns", "span_rows", "focal_x", "focal_y", "photo_zoom"
+    }
     with engine.connect() as connection:
         assert connection.execute(text("SELECT span_columns, span_rows FROM item WHERE id = 1")).one() == (1, 1)
+        assert connection.execute(text("SELECT focal_x, focal_y, photo_zoom FROM item WHERE id = 1")).one() == (0.5, 0.5, 1)
 
 
 def test_replacing_only_photo_does_not_reuse_cached_media_url(client: TestClient) -> None:

@@ -17,9 +17,12 @@ def update_item(item_id: int, data: ItemUpdate, user: CurrentUser, session: Sess
     item = get_owned_item(session, user, item_id)
     changes = data.model_dump(exclude_unset=True, exclude_none=True)
     if item.type == "photo":
-        changes = {k: v for k, v in changes.items() if k in ("caption", "span_columns", "span_rows")}
+        changes = {k: v for k, v in changes.items() if k in ("caption", "span_columns", "span_rows", "focal_x", "focal_y", "photo_zoom")}
     else:
         changes.pop("caption", None)
+        changes.pop("focal_x", None)
+        changes.pop("focal_y", None)
+        changes.pop("photo_zoom", None)
     for key, value in changes.items():
         setattr(item, key, value)
     item.book.updated_at = utcnow()

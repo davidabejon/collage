@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router'
 import { useBook } from '../api/queries'
 import type { Item } from '../api/types'
 import { Lightbox } from '../components/book/Lightbox'
+import { PhotoCropDialog } from '../components/book/PhotoCropDialog'
 import { SortableGrid } from '../components/book/SortableGrid'
 import { StylePanel } from '../components/book/StylePanel'
 import { useBookItems } from '../components/book/useBookItems'
@@ -28,6 +29,7 @@ export function BookPage() {
   const [styleOpen, setStyleOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [viewing, setViewing] = useState<Item | null>(null)
+  const [framing, setFraming] = useState<{ item: Item; aspect: number } | null>(null)
   const [deleting, setDeleting] = useState<Item | null>(null)
 
   const uploadFiles = async (list: FileList | File[]) => {
@@ -138,6 +140,7 @@ export function BookPage() {
               onUpdate={(id, patch) => actions.update.mutate({ id, data: patch })}
               onDelete={setDeleting}
               onOpen={setViewing}
+              onFrame={(item, aspect) => setFraming({ item, aspect })}
               trailing={Array.from({ length: uploading }, (_, i) => (
                 <li key={`uploading-${i}`} aria-hidden="true">
                   <div className="bg-white p-2 pb-0 shadow-polaroid sm:p-2.5 sm:pb-0">
@@ -198,6 +201,15 @@ export function BookPage() {
       <StylePanel book={data} open={styleOpen} onClose={() => setStyleOpen(false)} />
       <BookSettingsDialog book={settingsOpen ? data : null} onClose={() => setSettingsOpen(false)} onDeleted={() => navigate('/', { replace: true })} />
       <Lightbox item={viewing} onClose={() => setViewing(null)} />
+      <PhotoCropDialog
+        item={framing?.item ?? null}
+        aspect={framing?.aspect ?? 1}
+        saving={actions.update.isPending}
+        onClose={() => setFraming(null)}
+        onSave={(frame) => {
+          if (framing) actions.update.mutate({ id: framing.item.id, data: frame }, { onSuccess: () => setFraming(null) })
+        }}
+      />
       <ConfirmDialog
         open={deleting !== null}
         title={deleting?.type === 'note' ? '¿Quitar esta nota?' : '¿Quitar esta foto?'}

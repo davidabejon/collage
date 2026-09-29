@@ -23,6 +23,9 @@ export type Item = {
   position: number
   span_columns: number
   span_rows: number
+  focal_x: number
+  focal_y: number
+  photo_zoom: number
   caption: string
   text: string
   note_color: string
@@ -31,4 +34,4 @@ export type Item = {
 export type BookDetail = BookSummary & { items: Item[] }
 
 export type BookUpdate = Partial<Pick<BookSummary, 'title' | 'bg_color' | 'text_color' | 'cover_color'>>
-export type ItemUpdate = Partial<Pick<Item, 'caption' | 'text' | 'note_color' | 'span_columns' | 'span_rows'>>
+export type ItemUpdate = Partial<Pick<Item, 'caption' | 'text' | 'note_color' | 'span_columns' | 'span_rows' | 'focal_x' | 'focal_y' | 'photo_zoom'>>

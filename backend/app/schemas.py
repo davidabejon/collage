@@ -60,6 +60,9 @@ class ItemOut(BaseModel):
     position: int
     span_columns: int
     span_rows: int
+    focal_x: float
+    focal_y: float
+    photo_zoom: float
     caption: str
     text: str
     note_color: str
@@ -80,6 +83,9 @@ class ItemUpdate(BaseModel):
     note_color: HexColor | None = None
     span_columns: int | None = Field(default=None, ge=1, le=50)
     span_rows: int | None = Field(default=None, ge=1, le=50)
+    focal_x: float | None = Field(default=None, ge=0, le=1, allow_inf_nan=False)
+    focal_y: float | None = Field(default=None, ge=0, le=1, allow_inf_nan=False)
+    photo_zoom: float | None = Field(default=None, ge=1, le=4, allow_inf_nan=False)
 
 
 class OrderUpdate(BaseModel):

@@ -31,6 +31,9 @@ def init_db() -> None:
             for name in ("span_columns", "span_rows"):
                 if name not in columns:
                     connection.execute(text(f"ALTER TABLE item ADD COLUMN {name} INTEGER NOT NULL DEFAULT 1"))
+            for name, default in (("focal_x", 0.5), ("focal_y", 0.5), ("photo_zoom", 1)):
+                if name not in columns:
+                    connection.execute(text(f"ALTER TABLE item ADD COLUMN {name} REAL NOT NULL DEFAULT {default}"))
 
 
 def get_session() -> Iterator[Session]:

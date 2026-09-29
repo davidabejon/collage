@@ -46,6 +46,9 @@ class Item(SQLModel, table=True):
     position: int = 0
     span_columns: int = Field(default=1, ge=1, le=50)
     span_rows: int = Field(default=1, ge=1, le=50)
+    focal_x: float = Field(default=0.5, ge=0, le=1)
+    focal_y: float = Field(default=0.5, ge=0, le=1)
+    photo_zoom: float = Field(default=1, ge=1, le=4)
     image_path: str | None = None
     thumb_path: str | None = None
     caption: str = Field(default="", max_length=140)
