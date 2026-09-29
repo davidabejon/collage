@@ -67,6 +67,15 @@
     pointer-events: none;
   }
 
+  .notebook-paper {
+    background-color: #fffdf6;
+    background-image:
+      linear-gradient(rgb(91 148 186 / 0.2) 1px, transparent 1px),
+      linear-gradient(90deg, rgb(91 148 186 / 0.2) 1px, transparent 1px),
+      linear-gradient(90deg, transparent 0 27px, rgb(190 102 92 / 0.38) 27px 28px, transparent 28px);
+    background-size: 18px 18px, 18px 18px, 100% 100%;
+  }
+
   .postit-fold {
     background-image: linear-gradient(225deg, rgb(0 0 0 / 0.08) 0 14px, transparent 14px),
       linear-gradient(180deg, rgb(255 255 255 / 0.25), transparent 30%);

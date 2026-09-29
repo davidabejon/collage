@@ -8,7 +8,7 @@ import { SortableGrid } from '../components/book/SortableGrid'
 import { StylePanel } from '../components/book/StylePanel'
 import { useBookItems } from '../components/book/useBookItems'
 import { BookSettingsDialog } from '../components/library/BookSettingsDialog'
-import { NOTE_COLORS } from '../lib/design'
+import { NOTE_COLORS, tiltFor } from '../lib/design'
 import { Button, IconButton, Spinner } from '../ui/Button'
 import { ConfirmDialog } from '../ui/ConfirmDialog'
 import { IconBack, IconCamera, IconDots, IconEdit, IconEye, IconNote, IconPalette } from '../ui/icons'
@@ -139,7 +139,13 @@ export function BookPage() {
           style={{ '--book-bg': data.bg_color, color: data.text_color } as CSSProperties}
         >
           <div className="mb-10 text-center sm:mb-14">
-            <h2 className="font-hand text-5xl leading-none sm:text-6xl">{data.title}</h2>
+            <div
+              className="notebook-paper relative mx-auto w-fit max-w-full -rotate-1 px-7 py-3 shadow-polaroid sm:px-10 sm:py-4"
+              style={{ '--tape-rotate': `${tiltFor(data.id, 2)}deg` } as CSSProperties}
+            >
+              <span className="tape" aria-hidden="true" />
+              <h2 className="wrap-break-word font-hand text-5xl leading-none sm:text-6xl">{data.title}</h2>
+            </div>
             {data.items.length > 0 && (
               <p className="mt-2 text-sm opacity-70">
                 {photos} {photos === 1 ? 'foto' : 'fotos'} · {notes} {notes === 1 ? 'nota' : 'notas'}
