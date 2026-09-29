@@ -91,8 +91,6 @@ export function BookPage() {
   }
 
   const data = book.data
-  const photos = data.items.filter((i) => i.type === 'photo').length
-  const notes = data.items.length - photos
 
   const toolbarActions = [
     { label: 'Fotos', icon: <IconCamera />, onClick: () => fileInput?.click() },
@@ -146,11 +144,6 @@ export function BookPage() {
               <span className="tape" aria-hidden="true" />
               <h2 className="wrap-break-word font-hand text-5xl leading-none sm:text-6xl">{data.title}</h2>
             </div>
-            {data.items.length > 0 && (
-              <p className="mt-2 text-sm opacity-70">
-                {photos} {photos === 1 ? 'foto' : 'fotos'} · {notes} {notes === 1 ? 'nota' : 'notas'}
-              </p>
-            )}
           </div>
 
           {data.items.length === 0 && uploading === 0 ? (
