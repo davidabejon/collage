@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import type { BookSummary } from '../../api/types'
 import { bookCoverUrl, mediaUrl } from '../../api/endpoints'
-import { useAddCollaborator, useBook, useDeleteBook, useUpdateBook, useUploadBookCover } from '../../api/queries'
+import { useAddCollaborator, useBook, useDeleteBook, useRemoveBookCover, useUpdateBook, useUploadBookCover } from '../../api/queries'
 import { useMe } from '../../auth/useAuth'
 import { Button } from '../../ui/Button'
 import { ConfirmDialog } from '../../ui/ConfirmDialog'
@@ -28,6 +28,7 @@ function Content({ book, onClose, onDeleted }: { book: BookSummary; onClose: () 
   const current = useBook(book.id)
   const update = useUpdateBook(book.id)
   const uploadCover = useUploadBookCover()
+  const removeCover = useRemoveBookCover()
   const addCollaborator = useAddCollaborator(book.id)
   const remove = useDeleteBook()
   const { data: user } = useMe()
@@ -57,10 +58,14 @@ function Content({ book, onClose, onDeleted }: { book: BookSummary; onClose: () 
         initialCoverImage={book.cover_image ? bookCoverUrl(book) : undefined}
         albumPhotos={albumPhotos}
         submitLabel="Guardar"
-        busy={update.isPending || uploadCover.isPending}
-        error={uploadCover.error?.message ?? update.error?.message}
-        onSubmit={(title, cover_color, _collaborator, coverImage, coverItemId) => update.mutate({ title, cover_color }, {
+        busy={update.isPending || uploadCover.isPending || removeCover.isPending}
+        error={removeCover.error?.message ?? uploadCover.error?.message ?? update.error?.message}
+        onSubmit={(title, cover_color, _collaborator, coverImage, coverItemId, shouldRemoveCover) => update.mutate({ title, cover_color }, {
           onSuccess: () => {
+            if (shouldRemoveCover) {
+              removeCover.mutate(book.id, { onSuccess: onClose })
+              return
+            }
             if (!coverImage && coverItemId === undefined) {
               onClose()
               return

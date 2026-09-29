@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Button } from '../../ui/Button'
 import { ColorField } from '../../ui/ColorField'
-import { IconCamera } from '../../ui/icons'
+import { IconCamera, IconTrash } from '../../ui/icons'
 import { COVER_COLORS } from '../../lib/design'
 
 type AlbumPhoto = { id: number; url: string; label: string }
@@ -15,7 +15,7 @@ type Props = {
   submitLabel: string
   busy?: boolean
   error?: string
-  onSubmit: (title: string, cover: string, collaborator?: string, coverImage?: File, coverItemId?: number) => void
+  onSubmit: (title: string, cover: string, collaborator?: string, coverImage?: File, coverItemId?: number, removeCover?: boolean) => void
 }
 
 export function BookForm({ initialTitle = '', initialCover = COVER_COLORS[0], initialCoverImage, albumPhotos = [], allowCollaborator = false, submitLabel, busy, error, onSubmit }: Props) {
@@ -24,7 +24,8 @@ export function BookForm({ initialTitle = '', initialCover = COVER_COLORS[0], in
   const [collaborator, setCollaborator] = useState('')
   const [selectedCover, setSelectedCover] = useState<{ file: File; preview: string } | null>(null)
   const [selectedAlbumPhoto, setSelectedAlbumPhoto] = useState<number | null>(null)
-  const coverPreview = selectedCover?.preview ?? albumPhotos.find((photo) => photo.id === selectedAlbumPhoto)?.url ?? initialCoverImage
+  const [removeCover, setRemoveCover] = useState(false)
+  const coverPreview = selectedCover?.preview ?? albumPhotos.find((photo) => photo.id === selectedAlbumPhoto)?.url ?? (removeCover ? undefined : initialCoverImage)
 
   useEffect(() => () => {
     if (selectedCover) URL.revokeObjectURL(selectedCover.preview)
@@ -32,7 +33,7 @@ export function BookForm({ initialTitle = '', initialCover = COVER_COLORS[0], in
 
   const submit = (e: FormEvent) => {
     e.preventDefault()
-    if (title.trim()) onSubmit(title.trim(), cover, collaborator.trim() || undefined, selectedCover?.file, selectedAlbumPhoto ?? undefined)
+    if (title.trim()) onSubmit(title.trim(), cover, collaborator.trim() || undefined, selectedCover?.file, selectedAlbumPhoto ?? undefined, removeCover)
   }
 
   return (
@@ -74,6 +75,7 @@ export function BookForm({ initialTitle = '', initialCover = COVER_COLORS[0], in
                 onClick={() => {
                   setSelectedCover(null)
                   setSelectedAlbumPhoto(photo.id)
+                  setRemoveCover(false)
                 }}
                 className={`aspect-square overflow-hidden rounded-md ring-2 transition ${selectedAlbumPhoto === photo.id ? 'ring-accent' : 'ring-transparent hover:ring-line'}`}
               >
@@ -98,12 +100,26 @@ export function BookForm({ initialTitle = '', initialCover = COVER_COLORS[0], in
             const file = event.target.files?.[0]
             if (file) {
               setSelectedAlbumPhoto(null)
+              setRemoveCover(false)
               setSelectedCover({ file, preview: URL.createObjectURL(file) })
             }
             event.target.value = ''
           }}
         />
         {selectedCover && <p className="mt-1 truncate text-xs text-ink-soft">{selectedCover.file.name}</p>}
+        {(initialCoverImage || selectedCover || selectedAlbumPhoto !== null) && (
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedCover(null)
+              setSelectedAlbumPhoto(null)
+              setRemoveCover(true)
+            }}
+            className="mt-2 inline-flex min-h-9 items-center gap-2 rounded-full px-3 text-sm font-medium text-red-800 transition hover:bg-red-50"
+          >
+            <IconTrash width={16} height={16} /> Quitar imagen de portada
+          </button>
+        )}
       </div>
 
       {allowCollaborator && (

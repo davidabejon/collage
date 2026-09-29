@@ -73,6 +73,12 @@ def test_book_cover_upload_replace_and_delete(client: TestClient) -> None:
     assert client.get(cover_url).content != first_image.content
     assert len(list(Path(get_settings().media_dir).rglob("*.webp"))) == 2
 
+    removed = client.delete(cover_url)
+    assert removed.status_code == 200
+    assert removed.json()["cover_image"] is False
+    assert client.get(cover_url).status_code == 404
+    assert list(Path(get_settings().media_dir).rglob("*.webp")) == []
+
     assert client.delete(f"/api/books/{book['id']}").status_code == 204
     assert list(Path(get_settings().media_dir).rglob("*.webp")) == []
 

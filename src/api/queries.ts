@@ -39,6 +39,21 @@ export function useUploadBookCover() {
   })
 }
 
+export function useRemoveBookCover() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (bookId: number) => booksApi.removeCover(bookId),
+    onSuccess: (updatedBook) => {
+      qc.setQueryData<BookSummary[]>(keys.books, (current) =>
+        current?.map((book) => (book.id === updatedBook.id ? updatedBook : book)),
+      )
+      qc.setQueryData<BookDetail>(keys.book(updatedBook.id), (current) =>
+        current ? { ...current, ...updatedBook } : current,
+      )
+    },
+  })
+}
+
 export function useAddCollaborator(id: number) {
   const qc = useQueryClient()
   return useMutation({

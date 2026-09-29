@@ -149,6 +149,20 @@ def use_album_photo_as_cover(book_id: int, item_id: int, user: CurrentUser, sess
     return _save_cover(session, book, new_paths)
 
 
+@router.delete("/{book_id}/cover", response_model=BookSummary)
+def remove_cover(book_id: int, user: CurrentUser, session: SessionDep) -> BookSummary:
+    book = get_owned_book(session, user, book_id)
+    old_paths = (book.cover_image_path, book.cover_thumb_path)
+    book.cover_image_path = None
+    book.cover_thumb_path = None
+    book.updated_at = utcnow()
+    session.add(book)
+    session.commit()
+    session.refresh(book)
+    delete_media(*old_paths)
+    return _summary(session, book, len(book.items))
+
+
 @router.get("/{book_id}/cover")
 def get_cover(
     book_id: int, user: CurrentUser, session: SessionDep, size: str = "thumb"

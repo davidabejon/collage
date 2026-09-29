@@ -22,6 +22,7 @@ export const booksApi = {
   },
   useAlbumPhotoAsCover: (bookId: number, itemId: number) =>
     request<BookSummary>(`/books/${bookId}/cover/from-item/${itemId}`, { method: 'POST' }),
+  removeCover: (id: number) => request<BookSummary>(`/books/${id}/cover`, { method: 'DELETE' }),
   addCollaborator: (id: number, username: string) =>
     request<BookSummary>(`/books/${id}/collaborators`, { method: 'POST', body: json({ username }) }),
   update: (id: number, data: BookUpdate) =>
