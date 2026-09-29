@@ -13,8 +13,10 @@ export const authApi = {
 export const booksApi = {
   list: () => request<BookSummary[]>('/books'),
   get: (id: number) => request<BookDetail>(`/books/${id}`),
-  create: (title: string, cover_color: string) =>
-    request<BookSummary>('/books', { method: 'POST', body: json({ title, cover_color }) }),
+  create: (title: string, cover_color: string, collaborator_username?: string) =>
+    request<BookSummary>('/books', { method: 'POST', body: json({ title, cover_color, collaborator_username }) }),
+  addCollaborator: (id: number, username: string) =>
+    request<BookSummary>(`/books/${id}/collaborators`, { method: 'POST', body: json({ username }) }),
   update: (id: number, data: BookUpdate) =>
     request<BookSummary>(`/books/${id}`, { method: 'PATCH', body: json(data) }),
   remove: (id: number) => request<void>(`/books/${id}`, { method: 'DELETE' }),

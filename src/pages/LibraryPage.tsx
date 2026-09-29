@@ -88,11 +88,12 @@ export function LibraryPage() {
         {creating && (
           <BookForm
             submitLabel="Crear libro"
+            allowCollaborator
             busy={create.isPending}
             error={create.error?.message}
-            onSubmit={(title, cover) =>
+            onSubmit={(title, cover, collaborator) =>
               create.mutate(
-                { title, cover },
+                { title, cover, collaborator },
                 {
                   onSuccess: (book) => {
                     setCreating(false)

@@ -1,10 +1,10 @@
 from fastapi import APIRouter, File, HTTPException, UploadFile, status
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlmodel import select
 
 from ..deps import SessionDep, get_owned_book
-from ..models import Book, Item, utcnow
-from ..schemas import BookCreate, BookDetail, BookSummary, BookUpdate, ItemOut, NoteCreate, OrderUpdate
+from ..models import Book, BookCollaborator, Item, User, utcnow
+from ..schemas import BookCreate, BookDetail, BookSummary, BookUpdate, CollaboratorAdd, ItemOut, NoteCreate, OrderUpdate, UserOut
 from ..security import CurrentUser
 from ..services.media import delete_media, store_image
 
@@ -18,36 +18,74 @@ def _next_position(session: SessionDep, book_id: int) -> int:
     return (current if current is not None else -1) + 1
 
 
+def _summary(session: SessionDep, book: Book, item_count: int = 0) -> BookSummary:
+    collaborators = session.exec(
+        select(User).join(BookCollaborator, BookCollaborator.user_id == User.id).where(BookCollaborator.book_id == book.id)
+    ).all()
+    return BookSummary.model_validate({
+        **book.model_dump(), "item_count": item_count, "owner_username": book.owner.username,
+        "collaborators": [UserOut.model_validate(member) for member in collaborators],
+    })
+
+
+def _find_collaborator(session: SessionDep, username: str, owner_id: int) -> User:
+    user = session.exec(select(User).where(func.lower(User.username) == username.lower())).first()
+    if user is None:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    if user.id == owner_id:
+        raise HTTPException(status_code=400, detail="El dueño ya tiene acceso al libro")
+    return user
+
+
 @router.get("", response_model=list[BookSummary])
 def list_books(user: CurrentUser, session: SessionDep) -> list[BookSummary]:
+    shared = select(BookCollaborator.book_id).where(BookCollaborator.user_id == user.id)
     rows = session.exec(
         select(Book, func.count(Item.id))
         .join(Item, isouter=True)
-        .where(Book.owner_id == user.id)
+        .where(or_(Book.owner_id == user.id, Book.id.in_(shared)))
         .group_by(Book.id)
         .order_by(Book.updated_at.desc())  # type: ignore[attr-defined]
     ).all()
-    return [BookSummary.model_validate(book).model_copy(update={"item_count": count}) for book, count in rows]
+    return [_summary(session, book, count) for book, count in rows]
 
 
 @router.post("", response_model=BookSummary, status_code=status.HTTP_201_CREATED)
-def create_book(data: BookCreate, user: CurrentUser, session: SessionDep) -> Book:
+def create_book(data: BookCreate, user: CurrentUser, session: SessionDep) -> BookSummary:
+    collaborator = _find_collaborator(session, data.collaborator_username, user.id) if data.collaborator_username else None
     book = Book(owner_id=user.id, title=data.title, cover_color=data.cover_color)
     session.add(book)
+    session.flush()
+    if collaborator:
+        session.add(BookCollaborator(book_id=book.id, user_id=collaborator.id))
     session.commit()
     session.refresh(book)
-    return book
+    return _summary(session, book)
+
+
+@router.post("/{book_id}/collaborators", response_model=BookSummary)
+def add_collaborator(book_id: int, data: CollaboratorAdd, user: CurrentUser, session: SessionDep) -> BookSummary:
+    book = get_owned_book(session, user, book_id)
+    collaborator = _find_collaborator(session, data.username, book.owner_id)
+    existing = session.get(BookCollaborator, (book_id, collaborator.id))
+    if existing:
+        raise HTTPException(status_code=409, detail="Este usuario ya comparte el libro")
+    session.add(BookCollaborator(book_id=book_id, user_id=collaborator.id))
+    book.updated_at = utcnow()
+    session.add(book)
+    session.commit()
+    return _summary(session, book, len(book.items))
 
 
 @router.get("/{book_id}", response_model=BookDetail)
 def get_book(book_id: int, user: CurrentUser, session: SessionDep) -> BookDetail:
     book = get_owned_book(session, user, book_id)
     items = [ItemOut.model_validate(i) for i in book.items]
-    return BookDetail.model_validate({**BookSummary.model_validate(book).model_dump(), "items": items, "item_count": len(items)})
+    return BookDetail.model_validate({**_summary(session, book, len(items)).model_dump(), "items": items})
 
 
 @router.patch("/{book_id}", response_model=BookSummary)
-def update_book(book_id: int, data: BookUpdate, user: CurrentUser, session: SessionDep) -> Book:
+def update_book(book_id: int, data: BookUpdate, user: CurrentUser, session: SessionDep) -> BookSummary:
     book = get_owned_book(session, user, book_id)
     for key, value in data.model_dump(exclude_unset=True, exclude_none=True).items():
         setattr(book, key, value)
@@ -55,13 +93,17 @@ def update_book(book_id: int, data: BookUpdate, user: CurrentUser, session: Sess
     session.add(book)
     session.commit()
     session.refresh(book)
-    return book
+    return _summary(session, book, len(book.items))
 
 
 @router.delete("/{book_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_book(book_id: int, user: CurrentUser, session: SessionDep) -> None:
     book = get_owned_book(session, user, book_id)
+    if book.owner_id != user.id:
+        raise HTTPException(status_code=403, detail="Solo el dueño puede eliminar el libro")
     paths = [p for item in book.items for p in (item.image_path, item.thumb_path)]
+    for member in session.exec(select(BookCollaborator).where(BookCollaborator.book_id == book_id)).all():
+        session.delete(member)
     session.delete(book)
     session.commit()
     delete_media(*paths)

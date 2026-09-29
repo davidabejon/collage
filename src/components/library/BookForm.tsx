@@ -6,19 +6,21 @@ import { COVER_COLORS } from '../../lib/design'
 type Props = {
   initialTitle?: string
   initialCover?: string
+  allowCollaborator?: boolean
   submitLabel: string
   busy?: boolean
   error?: string
-  onSubmit: (title: string, cover: string) => void
+  onSubmit: (title: string, cover: string, collaborator?: string) => void
 }
 
-export function BookForm({ initialTitle = '', initialCover = COVER_COLORS[0], submitLabel, busy, error, onSubmit }: Props) {
+export function BookForm({ initialTitle = '', initialCover = COVER_COLORS[0], allowCollaborator = false, submitLabel, busy, error, onSubmit }: Props) {
   const [title, setTitle] = useState(initialTitle)
   const [cover, setCover] = useState(initialCover)
+  const [collaborator, setCollaborator] = useState('')
 
   const submit = (e: FormEvent) => {
     e.preventDefault()
-    if (title.trim()) onSubmit(title.trim(), cover)
+    if (title.trim()) onSubmit(title.trim(), cover, collaborator.trim() || undefined)
   }
 
   return (
@@ -49,6 +51,23 @@ export function BookForm({ initialTitle = '', initialCover = COVER_COLORS[0], su
       </div>
 
       <ColorField label="Color de la tapa" value={cover} colors={COVER_COLORS} onChange={setCover} />
+
+      {allowCollaborator && (
+        <div>
+          <label htmlFor="book-collaborator" className="text-sm font-medium text-ink-soft">Crear con otro usuario (opcional)</label>
+          <input
+            id="book-collaborator"
+            value={collaborator}
+            onChange={(e) => setCollaborator(e.target.value)}
+            minLength={3}
+            maxLength={32}
+            pattern="[a-zA-Z0-9_.-]+"
+            placeholder="Nombre de usuario"
+            autoComplete="off"
+            className="mt-1 w-full rounded-lg border border-line bg-white/80 px-4 py-3 outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
+          />
+        </div>
+      )}
 
       {error && (
         <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800">

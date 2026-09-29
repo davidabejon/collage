@@ -2,6 +2,9 @@ export type User = { id: number; username: string }
 
 export type BookSummary = {
   id: number
+  owner_id: number
+  owner_username: string
+  collaborators: User[]
   title: string
   bg_color: string
   text_color: string

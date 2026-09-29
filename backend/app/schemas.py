@@ -23,6 +23,11 @@ class UserOut(BaseModel):
 class BookCreate(BaseModel):
     title: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=80)]
     cover_color: HexColor = "#8c3b2e"
+    collaborator_username: Username | None = None
+
+
+class CollaboratorAdd(BaseModel):
+    username: Username
 
 
 class BookUpdate(BaseModel):
@@ -42,6 +47,9 @@ class BookSummary(BaseModel):
     created_at: datetime
     updated_at: datetime
     item_count: int = 0
+    owner_id: int
+    owner_username: str
+    collaborators: list[UserOut] = []
 
 
 class ItemOut(BaseModel):

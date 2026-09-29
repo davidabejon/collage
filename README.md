@@ -2,6 +2,8 @@
 
 Libros de recuerdos con fotos polaroid y post-its. Frontend React + Vite + Tailwind, backend FastAPI + SQLite.
 
+Los libros pueden crearse con otro usuario registrado o compartirse más tarde desde los ajustes del libro, indicando su nombre de usuario. Los colaboradores pueden editar, añadir contenido y compartir el libro con más usuarios; solo el dueño original puede eliminarlo. El acceso se concede inmediatamente, sin invitación pendiente.
+
 ## Backend
 
 ```powershell

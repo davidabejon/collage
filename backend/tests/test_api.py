@@ -67,6 +67,64 @@ def test_other_users_cannot_access(client: TestClient) -> None:
     assert client.delete(f"/api/items/{photo['id']}").status_code == 404
 
 
+def test_create_shared_book_and_owner_only_delete(client: TestClient) -> None:
+    register(client, "eva")
+    client.post("/api/auth/logout")
+    register(client, "ana")
+    missing = client.post("/api/books", json={"title": "X", "collaborator_username": "nadie"})
+    assert missing.status_code == 404
+    assert client.get("/api/books").json() == []
+    book = client.post("/api/books", json={"title": "Juntos", "collaborator_username": "EVA"}).json()
+    bid = book["id"]
+    assert book["owner_username"] == "ana"
+    assert [member["username"] for member in book["collaborators"]] == ["eva"]
+    client.post("/api/auth/logout")
+    client.post("/api/auth/login", json={"username": "eva", "password": "secreto123"})
+    assert [entry["id"] for entry in client.get("/api/books").json()] == [bid]
+    assert client.patch(f"/api/books/{bid}", json={"title": "Nuestro"}).status_code == 200
+    photo = client.post(
+        f"/api/books/{bid}/photos", files=[("files", ("a.png", png_bytes(), "image/png"))]
+    ).json()[0]
+    assert client.get(f"/api/media/{photo['id']}").status_code == 200
+    assert client.patch(f"/api/items/{photo['id']}", json={"caption": "Juntos"}).status_code == 200
+    assert client.post(f"/api/books/{bid}/notes", json={"text": "Hola"}).status_code == 201
+    ids = [item["id"] for item in client.get(f"/api/books/{bid}").json()["items"]]
+    assert client.put(f"/api/books/{bid}/order", json={"item_ids": ids[::-1]}).status_code == 204
+    assert client.delete(f"/api/items/{photo['id']}").status_code == 204
+    assert client.delete(f"/api/books/{bid}").status_code == 403
+    client.post("/api/auth/logout")
+    client.post("/api/auth/login", json={"username": "ana", "password": "secreto123"})
+    assert client.get(f"/api/books/{bid}").json()["title"] == "Nuestro"
+    assert client.delete(f"/api/books/{bid}").status_code == 204
+    client.post("/api/auth/logout")
+    client.post("/api/auth/login", json={"username": "eva", "password": "secreto123"})
+    assert client.get("/api/books").json() == []
+
+
+def test_add_collaborators_to_existing_book(client: TestClient) -> None:
+    register(client, "ana")
+    bid = client.post("/api/books", json={"title": "Viaje"}).json()["id"]
+    assert client.post(f"/api/books/{bid}/collaborators", json={"username": "ana"}).status_code == 400
+    assert client.post(f"/api/books/{bid}/collaborators", json={"username": "desconocido"}).status_code == 404
+    client.post("/api/auth/logout")
+    register(client, "eva")
+    assert client.post(f"/api/books/{bid}/collaborators", json={"username": "eva"}).status_code == 404
+    client.post("/api/auth/logout")
+    register(client, "leo")
+    client.post("/api/auth/logout")
+    client.post("/api/auth/login", json={"username": "ana", "password": "secreto123"})
+    assert client.post(f"/api/books/{bid}/collaborators", json={"username": "eva"}).status_code == 200
+    assert client.post(f"/api/books/{bid}/collaborators", json={"username": "EVA"}).status_code == 409
+    client.post("/api/auth/logout")
+    client.post("/api/auth/login", json={"username": "eva", "password": "secreto123"})
+    result = client.post(f"/api/books/{bid}/collaborators", json={"username": "leo"})
+    assert result.status_code == 200
+    assert {member["username"] for member in result.json()["collaborators"]} == {"eva", "leo"}
+    client.post("/api/auth/logout")
+    client.post("/api/auth/login", json={"username": "leo", "password": "secreto123"})
+    assert client.get(f"/api/books/{bid}").status_code == 200
+
+
 def test_upload_notes_reorder_and_cascade(client: TestClient) -> None:
     register(client)
     book = client.post("/api/books", json={"title": "Viaje"}).json()

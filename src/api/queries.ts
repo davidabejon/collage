@@ -15,8 +15,17 @@ export const useBook = (id: number) =>
 export function useCreateBook() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ title, cover }: { title: string; cover: string }) => booksApi.create(title, cover),
+    mutationFn: ({ title, cover, collaborator }: { title: string; cover: string; collaborator?: string }) =>
+      booksApi.create(title, cover, collaborator),
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.books, exact: true }),
+  })
+}
+
+export function useAddCollaborator(id: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (username: string) => booksApi.addCollaborator(id, username),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.books }),
   })
 }
 

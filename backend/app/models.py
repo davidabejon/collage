@@ -34,6 +34,10 @@ class Book(SQLModel, table=True):
         sa_relationship_kwargs={"cascade": "all, delete-orphan", "order_by": "Item.position"},
     )
 
+class BookCollaborator(SQLModel, table=True):
+    book_id: int = Field(foreign_key="book.id", primary_key=True, ondelete="CASCADE")
+    user_id: int = Field(foreign_key="user.id", primary_key=True, ondelete="CASCADE")
+
 
 class Item(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
