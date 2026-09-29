@@ -35,7 +35,7 @@ function Polaroid({ item, textColor, lifted, onEditingChange, onUpdate, onDelete
       <span className="tape" aria-hidden="true" />
       <div className="aspect-square overflow-hidden bg-neutral-200">
         <img
-          src={mediaUrl(item.id)}
+          src={mediaUrl(item)}
           alt={item.caption || 'Foto'}
           loading="lazy"
           decoding="async"

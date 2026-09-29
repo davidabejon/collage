@@ -37,4 +37,5 @@ export const itemsApi = {
   remove: (id: number) => request<void>(`/items/${id}`, { method: 'DELETE' }),
 }
 
-export const mediaUrl = (itemId: number, size: 'thumb' | 'full' = 'thumb') => `/api/media/${itemId}?size=${size}`
+export const mediaUrl = (item: Item, size: 'thumb' | 'full' = 'thumb') =>
+  `/api/media/${item.id}?size=${size}&v=${encodeURIComponent(item.created_at)}`

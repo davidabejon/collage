@@ -55,6 +55,7 @@ class BookSummary(BaseModel):
 class ItemOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
+    created_at: datetime
     type: Literal["photo", "note"]
     position: int
     caption: str

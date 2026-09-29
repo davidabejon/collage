@@ -169,3 +169,21 @@ def test_invalid_uploads(client: TestClient) -> None:
     big = client.post(f"/api/books/{bid}/photos", files=[("files", ("a.png", png_bytes(), "image/png"))])
     assert big.status_code == 413
     assert client.get(f"/api/books/{bid}").json()["items"] == []
+
+
+def test_replacing_only_photo_does_not_reuse_cached_media_url(client: TestClient) -> None:
+    register(client)
+    book_id = client.post("/api/books", json={"title": "Fotos"}).json()["id"]
+    first = client.post(
+        f"/api/books/{book_id}/photos", files=[("files", ("first.png", png_bytes(), "image/png"))]
+    ).json()[0]
+    first_media = client.get(f"/api/media/{first['id']}")
+    assert first_media.headers["cache-control"] == "private, max-age=31536000, immutable"
+    assert client.delete(f"/api/items/{first['id']}").status_code == 204
+
+    second = client.post(
+        f"/api/books/{book_id}/photos", files=[("files", ("second.png", png_bytes((60, 30)), "image/png"))]
+    ).json()[0]
+    assert second["id"] == first["id"]
+    assert second["created_at"] != first["created_at"]
+    assert client.get(f"/api/media/{second['id']}").content != first_media.content

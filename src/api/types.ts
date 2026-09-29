@@ -18,6 +18,7 @@ export type ItemType = 'photo' | 'note'
 
 export type Item = {
   id: number
+  created_at: string
   type: ItemType
   position: number
   caption: string
