@@ -20,8 +20,6 @@ def update_item(item_id: int, data: ItemUpdate, user: CurrentUser, session: Sess
         changes = {k: v for k, v in changes.items() if k in ("caption", "span_columns", "span_rows")}
     else:
         changes.pop("caption", None)
-        changes.pop("span_columns", None)
-        changes.pop("span_rows", None)
     for key, value in changes.items():
         setattr(item, key, value)
     item.book.updated_at = utcnow()

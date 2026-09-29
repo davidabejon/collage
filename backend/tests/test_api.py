@@ -174,7 +174,7 @@ def test_invalid_uploads(client: TestClient) -> None:
     assert client.get(f"/api/books/{bid}").json()["items"] == []
 
 
-def test_photo_spans_are_persisted_and_notes_stay_single_cell(client: TestClient) -> None:
+def test_item_spans_are_persisted_for_photos_and_notes(client: TestClient) -> None:
     register(client)
     book_id = client.post("/api/books", json={"title": "Mosaico"}).json()["id"]
     photo = client.post(
@@ -188,8 +188,13 @@ def test_photo_spans_are_persisted_and_notes_stay_single_cell(client: TestClient
     assert client.patch(f"/api/items/{photo['id']}", json={"span_columns": 0}).status_code == 422
     assert client.patch(f"/api/items/{photo['id']}", json={"span_rows": 51}).status_code == 422
     note = client.post(f"/api/books/{book_id}/notes", json={"text": "Hola"}).json()
-    unchanged = client.patch(f"/api/items/{note['id']}", json={"span_columns": 2, "span_rows": 3}).json()
-    assert (unchanged["span_columns"], unchanged["span_rows"]) == (1, 1)
+    assert (note["span_columns"], note["span_rows"]) == (1, 1)
+    updated = client.patch(f"/api/items/{note['id']}", json={"span_columns": 2, "span_rows": 3})
+    assert updated.status_code == 200
+    assert (updated.json()["span_columns"], updated.json()["span_rows"]) == (2, 3)
+    persisted = {item["id"]: item for item in client.get(f"/api/books/{book_id}").json()["items"]}
+    assert (persisted[note["id"]]["span_columns"], persisted[note["id"]]["span_rows"]) == (2, 3)
+    assert client.patch(f"/api/items/{note['id']}", json={"span_rows": 0}).status_code == 422
 
 
 def test_existing_sqlite_items_get_default_spans(tmp_path: Path, monkeypatch) -> None:

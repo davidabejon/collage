@@ -25,7 +25,7 @@ export function ItemView(props: ItemViewProps) {
   return props.item.type === 'photo' ? <Polaroid {...props} /> : <PostIt {...props} />
 }
 
-function Polaroid({ item, textColor, lifted, onEditingChange, onUpdate, onDelete, onOpen }: ItemViewProps) {
+function ItemSizeControls({ item, onUpdate }: { item: Item; onUpdate: (data: ItemUpdate) => void }) {
   const [sizeOpen, setSizeOpen] = useState(false)
   const sizeButtonRef = useRef<HTMLSpanElement>(null)
   const sizePanelRef = useRef<HTMLDivElement>(null)
@@ -45,6 +45,38 @@ function Polaroid({ item, textColor, lifted, onEditingChange, onUpdate, onDelete
       document.removeEventListener('keydown', onKeyDown)
     }
   }, [sizeOpen])
+
+  return (
+    <span ref={sizeButtonRef}>
+      <ActionButton label="Cambiar tamaño" onClick={() => setSizeOpen((open) => !open)}>
+        <IconSize width={16} height={16} />
+      </ActionButton>
+      {sizeOpen && (
+        <div ref={sizePanelRef} {...stopDrag} className="absolute right-0 top-10 z-20 w-44 rounded-lg bg-white p-3 text-ink shadow-lg ring-1 ring-black/10">
+          <p className="mb-2 text-sm font-medium">Tamaño {item.type === 'photo' ? 'de la foto' : 'del post-it'}</p>
+          {([['Columnas', 'span_columns'], ['Filas', 'span_rows']] as const).map(([label, field]) => (
+            <label key={field} className="mb-2 flex items-center justify-between gap-2 text-sm last:mb-0">
+              {label}
+              <input
+                type="number"
+                min={1}
+                max={50}
+                value={item[field]}
+                onChange={(event) => {
+                  const next = Number(event.target.value)
+                  if (Number.isInteger(next) && next >= 1 && next <= 50) onUpdate({ [field]: next })
+                }}
+                className="w-16 rounded border border-line px-2 py-1 text-center"
+              />
+            </label>
+          ))}
+        </div>
+      )}
+    </span>
+  )
+}
+
+function Polaroid({ item, textColor, lifted, onEditingChange, onUpdate, onDelete, onOpen }: ItemViewProps) {
   const color = readableOn('#ffffff', textColor)
   return (
     <figure
@@ -89,36 +121,11 @@ function Polaroid({ item, textColor, lifted, onEditingChange, onUpdate, onDelete
           <ActionButton label="Ver en grande" onClick={onOpen}>
             <IconExpand width={16} height={16} />
           </ActionButton>
-          <span ref={sizeButtonRef}>
-            <ActionButton label="Cambiar tamaño" onClick={() => setSizeOpen((open) => !open)}>
-              <IconSize width={16} height={16} />
-            </ActionButton>
-          </span>
+          {onUpdate && <ItemSizeControls item={item} onUpdate={onUpdate} />}
           <ActionButton label="Quitar foto" onClick={onDelete}>
             <IconTrash width={16} height={16} />
           </ActionButton>
         </ActionBar>
-      )}
-      {sizeOpen && onUpdate && (
-        <div ref={sizePanelRef} {...stopDrag} className="absolute right-0 top-10 z-20 w-44 rounded-lg bg-white p-3 text-ink shadow-lg ring-1 ring-black/10">
-          <p className="mb-2 text-sm font-medium">Tamaño de la foto</p>
-          {([['Columnas', 'span_columns'], ['Filas', 'span_rows']] as const).map(([label, field]) => (
-            <label key={field} className="mb-2 flex items-center justify-between gap-2 text-sm last:mb-0">
-              {label}
-              <input
-                type="number"
-                min={1}
-                max={50}
-                value={item[field]}
-                onChange={(event) => {
-                  const next = Number(event.target.value)
-                  if (Number.isInteger(next) && next >= 1 && next <= 50) onUpdate({ [field]: next })
-                }}
-                className="w-16 rounded border border-line px-2 py-1 text-center"
-              />
-            </label>
-          ))}
-        </div>
       )}
     </figure>
   )
@@ -138,7 +145,7 @@ function PostIt({ item, textColor, lifted, onEditingChange, onUpdate, onDelete }
 
   return (
     <div
-      className={`postit-fold relative aspect-square p-3 transition-[rotate,scale,box-shadow] duration-200 animate-[stick_.25s_ease-out] sm:p-4 ${lifted ? 'shadow-lift' : 'shadow-polaroid'}`}
+      className={`postit-fold relative h-full p-3 transition-[rotate,scale,box-shadow] duration-200 animate-[stick_.25s_ease-out] sm:p-4 ${lifted ? 'shadow-lift' : 'shadow-polaroid'}`}
       style={{ ...tiltStyle(item.id, lifted), backgroundColor: item.note_color, color }}
     >
       <span aria-hidden="true" className="absolute inset-x-0 top-0 h-5 bg-black/[0.04]" />
@@ -163,6 +170,7 @@ function PostIt({ item, textColor, lifted, onEditingChange, onUpdate, onDelete }
           <ActionButton label="Cambiar color" onClick={() => setPaletteOpen((o) => !o)}>
             <IconPalette width={16} height={16} />
           </ActionButton>
+          <ItemSizeControls item={item} onUpdate={onUpdate} />
           <ActionButton label="Quitar nota" onClick={onDelete}>
             <IconTrash width={16} height={16} />
           </ActionButton>

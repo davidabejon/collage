@@ -12,7 +12,7 @@ export function ActionBar({ children }: { children: ReactNode }) {
   return (
     <div
       {...stopDrag}
-      className="absolute -right-2 -top-3 z-10 flex gap-1 opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100 pointer-coarse:opacity-100"
+      className="absolute -right-2 -top-3 z-10 flex gap-1 opacity-0 transition hover:opacity-100 group-hover:opacity-100 group-focus-within:opacity-100 pointer-coarse:opacity-100"
     >
       {children}
     </div>

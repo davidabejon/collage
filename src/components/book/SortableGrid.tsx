@@ -140,7 +140,7 @@ function SortableItem({ item, columns, textColor, onUpdate, onDelete, onOpen }: 
     <li
       ref={setNodeRef}
       {...pointerListeners}
-      style={{ transform: CSS.Translate.toString(transform), transition, gridColumn: `span ${item.type === 'photo' ? Math.min(item.span_columns, columns) : 1}`, gridRow: `span ${item.type === 'photo' ? item.span_rows : 1}` }}
+      style={{ transform: CSS.Translate.toString(transform), transition, gridColumn: `span ${Math.min(item.span_columns, columns)}`, gridRow: `span ${item.span_rows}` }}
       className={`group relative touch-manipulation select-none ${isDragging ? 'opacity-25' : ''} ${editing ? '' : 'cursor-grab active:cursor-grabbing'}`}
     >
       <ItemView
