@@ -34,6 +34,8 @@ def init_db() -> None:
             for name, default in (("focal_x", 0.5), ("focal_y", 0.5), ("photo_zoom", 1)):
                 if name not in columns:
                     connection.execute(text(f"ALTER TABLE item ADD COLUMN {name} REAL NOT NULL DEFAULT {default}"))
+            if "caption_align" not in columns:
+                connection.execute(text("ALTER TABLE item ADD COLUMN caption_align VARCHAR(6) NOT NULL DEFAULT 'center'"))
 
 
 def get_session() -> Iterator[Session]:

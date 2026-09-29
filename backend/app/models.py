@@ -49,6 +49,7 @@ class Item(SQLModel, table=True):
     focal_x: float = Field(default=0.5, ge=0, le=1)
     focal_y: float = Field(default=0.5, ge=0, le=1)
     photo_zoom: float = Field(default=1, ge=1, le=4)
+    caption_align: str = Field(default="center", max_length=6)
     image_path: str | None = None
     thumb_path: str | None = None
     caption: str = Field(default="", max_length=140)

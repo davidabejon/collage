@@ -63,6 +63,7 @@ class ItemOut(BaseModel):
     focal_x: float
     focal_y: float
     photo_zoom: float
+    caption_align: Literal["left", "center", "right"]
     caption: str
     text: str
     note_color: str
@@ -86,6 +87,7 @@ class ItemUpdate(BaseModel):
     focal_x: float | None = Field(default=None, ge=0, le=1, allow_inf_nan=False)
     focal_y: float | None = Field(default=None, ge=0, le=1, allow_inf_nan=False)
     photo_zoom: float | None = Field(default=None, ge=1, le=4, allow_inf_nan=False)
+    caption_align: Literal["left", "center", "right"] | None = None
 
 
 class OrderUpdate(BaseModel):

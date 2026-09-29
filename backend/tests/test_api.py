@@ -215,6 +215,22 @@ def test_photo_framing_is_persisted_and_restricted_to_photos(client: TestClient)
     assert (unchanged["focal_x"], unchanged["photo_zoom"]) == (0.5, 1)
 
 
+def test_photo_caption_alignment_is_saved(client: TestClient) -> None:
+    register(client)
+    book_id = client.post("/api/books", json={"title": "Pies"}).json()["id"]
+    photo = client.post(
+        f"/api/books/{book_id}/photos", files=[("files", ("a.png", png_bytes(), "image/png"))]
+    ).json()[0]
+    assert photo["caption_align"] == "center"
+    for alignment in ("left", "right", "center"):
+        response = client.patch(f"/api/items/{photo['id']}", json={"caption_align": alignment})
+        assert response.status_code == 200
+        assert response.json()["caption_align"] == alignment
+    assert client.patch(f"/api/items/{photo['id']}", json={"caption_align": "justify"}).status_code == 422
+    note = client.post(f"/api/books/{book_id}/notes", json={"text": "Nota"}).json()
+    assert client.patch(f"/api/items/{note['id']}", json={"caption_align": "right"}).json()["caption_align"] == "center"
+
+
 def test_existing_sqlite_items_get_default_spans_and_framing(tmp_path: Path, monkeypatch) -> None:
     engine = create_engine(f"sqlite:///{tmp_path / 'previous.db'}")
     with engine.begin() as connection:
@@ -224,11 +240,12 @@ def test_existing_sqlite_items_get_default_spans_and_framing(tmp_path: Path, mon
     db.init_db()
     db.init_db()
     assert {column["name"] for column in inspect(engine).get_columns("item")} >= {
-        "span_columns", "span_rows", "focal_x", "focal_y", "photo_zoom"
+        "span_columns", "span_rows", "focal_x", "focal_y", "photo_zoom", "caption_align"
     }
     with engine.connect() as connection:
         assert connection.execute(text("SELECT span_columns, span_rows FROM item WHERE id = 1")).one() == (1, 1)
         assert connection.execute(text("SELECT focal_x, focal_y, photo_zoom FROM item WHERE id = 1")).one() == (0.5, 0.5, 1)
+        assert connection.execute(text("SELECT caption_align FROM item WHERE id = 1")).scalar_one() == "center"
 
 
 def test_replacing_only_photo_does_not_reuse_cached_media_url(client: TestClient) -> None:

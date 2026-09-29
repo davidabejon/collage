@@ -127,14 +127,14 @@ function Polaroid({ item, textColor, lifted, onEditingChange, onUpdate, onDelete
       <div ref={frameRef} className="relative min-h-0 flex-1 overflow-hidden bg-neutral-200">
         <FramedPhoto item={item} />
       </div>
-      <figcaption className="flex h-11 items-center justify-center px-1 sm:h-13">
+      <figcaption className="flex h-11 min-w-0 items-center gap-1 px-1 sm:h-13">
         {onUpdate ? (
           <InlineText
             value={item.caption}
             placeholder="Pie de foto…"
             maxLength={140}
-            className="w-full truncate text-center font-hand text-xl leading-none sm:text-2xl"
-            style={{ color }}
+            className="min-w-0 grow truncate font-hand text-xl leading-none sm:text-2xl"
+            style={{ color, textAlign: item.caption_align }}
             onEditingChange={(e) => onEditingChange?.(e)}
             onSave={(caption) => onUpdate({ caption })}
           >
@@ -143,9 +143,23 @@ function Polaroid({ item, textColor, lifted, onEditingChange, onUpdate, onDelete
             )}
           </InlineText>
         ) : (
-          <span className="truncate font-hand text-xl sm:text-2xl" style={{ color }}>
+          <span className="min-w-0 grow truncate font-hand text-xl sm:text-2xl" style={{ color, textAlign: item.caption_align }}>
             {item.caption}
           </span>
+        )}
+        {onUpdate && (
+          <select
+            {...stopDrag}
+            aria-label="Alineación del pie"
+            title="Alineación del pie"
+            value={item.caption_align}
+            onChange={(event) => onUpdate({ caption_align: event.target.value as Item['caption_align'] })}
+            className="w-11 shrink-0 cursor-pointer rounded border border-line bg-white px-0.5 py-1 text-xs text-ink outline-none focus:border-accent sm:w-12"
+          >
+            <option value="left">Izq.</option>
+            <option value="center">Cen.</option>
+            <option value="right">Der.</option>
+          </select>
         )}
       </figcaption>
 
