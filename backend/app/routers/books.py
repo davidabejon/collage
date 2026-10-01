@@ -1,5 +1,4 @@
-from fastapi import APIRouter, File, HTTPException, UploadFile, status
-from fastapi.responses import FileResponse
+from fastapi import APIRouter, File, HTTPException, Response, UploadFile, status
 from sqlalchemy import func, or_
 from sqlmodel import select
 
@@ -7,7 +6,7 @@ from ..deps import SessionDep, get_owned_book
 from ..models import Book, BookCollaborator, Item, User, utcnow
 from ..schemas import BookCreate, BookDetail, BookSummary, BookUpdate, CollaboratorAdd, ItemOut, NoteCreate, OrderUpdate, UserOut
 from ..security import CurrentUser
-from ..services.media import copy_image, delete_media, resolve_media, store_image
+from ..services.media import delete_media, delete_unreferenced, read_media, store_image
 
 router = APIRouter(prefix="/api/books", tags=["books"])
 
@@ -109,7 +108,7 @@ def delete_book(book_id: int, user: CurrentUser, session: SessionDep) -> None:
         session.delete(member)
     session.delete(book)
     session.commit()
-    delete_media(*paths)
+    delete_unreferenced(session, *paths)
 
 
 def _save_cover(session: SessionDep, book: Book, new_paths: tuple[str, str]) -> BookSummary:
@@ -122,9 +121,9 @@ def _save_cover(session: SessionDep, book: Book, new_paths: tuple[str, str]) -> 
         session.refresh(book)
     except Exception:
         session.rollback()
-        delete_media(*new_paths)
+        delete_unreferenced(session, *new_paths)
         raise
-    delete_media(*old_paths)
+    delete_unreferenced(session, *old_paths)
     return _summary(session, book, len(book.items))
 
 
@@ -144,9 +143,7 @@ def use_album_photo_as_cover(book_id: int, item_id: int, user: CurrentUser, sess
     photo = next((item for item in book.items if item.id == item_id and item.type == "photo"), None)
     if photo is None or not photo.image_path or not photo.thumb_path:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Foto no encontrada en este libro")
-    assert user.id is not None
-    new_paths = copy_image(photo.image_path, photo.thumb_path, user.id)
-    return _save_cover(session, book, new_paths)
+    return _save_cover(session, book, (photo.image_path, photo.thumb_path))
 
 
 @router.delete("/{book_id}/cover", response_model=BookSummary)
@@ -159,22 +156,22 @@ def remove_cover(book_id: int, user: CurrentUser, session: SessionDep) -> BookSu
     session.add(book)
     session.commit()
     session.refresh(book)
-    delete_media(*old_paths)
+    delete_unreferenced(session, *old_paths)
     return _summary(session, book, len(book.items))
 
 
 @router.get("/{book_id}/cover")
 def get_cover(
     book_id: int, user: CurrentUser, session: SessionDep, size: str = "thumb"
-) -> FileResponse:
+) -> Response:
     if size not in ("thumb", "full"):
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Tamaño no válido")
     book = get_owned_book(session, user, book_id)
     rel = book.cover_thumb_path if size == "thumb" else book.cover_image_path
     if not rel:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Portada no encontrada")
-    return FileResponse(
-        resolve_media(rel),
+    return Response(
+        read_media(rel),
         media_type="image/webp",
         headers={"Cache-Control": "private, max-age=31536000, immutable"},
     )

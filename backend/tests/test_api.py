@@ -1,12 +1,16 @@
 from pathlib import Path
 
-from conftest import png_bytes, register
+import pytest
+from conftest import FakeB2, png_bytes, register
 from fastapi.testclient import TestClient
 from sqlalchemy import inspect, text
-from sqlmodel import create_engine
+from sqlmodel import create_engine, select
 
 from app import db
 from app.config import get_settings
+from app.db import get_session
+from app.main import app
+from app.models import Book, Item
 
 
 def test_register_login_me_logout(client: TestClient) -> None:
@@ -334,3 +338,118 @@ def test_replacing_only_photo_does_not_reuse_cached_media_url(client: TestClient
     assert second["id"] == first["id"]
     assert second["created_at"] != first["created_at"]
     assert client.get(f"/api/media/{second['id']}").content != first_media.content
+
+
+def _db_items() -> list[Item]:
+    session = next(app.dependency_overrides[get_session]())
+    return list(session.exec(select(Item).where(Item.type == "photo")).all())
+
+
+def _db_book(book_id: int) -> Book:
+    session = next(app.dependency_overrides[get_session]())
+    book = session.get(Book, book_id)
+    assert book is not None
+    return book
+
+
+def test_b2_storage_upload_read_cover_and_delete(client: TestClient, fake_b2: FakeB2) -> None:
+    register(client)
+    bid = client.post("/api/books", json={"title": "Nube"}).json()["id"]
+    photo = client.post(
+        f"/api/books/{bid}/photos", files=[("files", ("a.png", png_bytes(), "image/png"))]
+    ).json()[0]
+    assert len(fake_b2.objects) == 2
+    assert not Path(get_settings().media_dir).exists() or list(Path(get_settings().media_dir).rglob("*.webp")) == []
+
+    stored = _db_items()[0]
+    assert stored.image_path.startswith("b2://test-bucket/") and stored.image_path.endswith(".webp")
+    assert stored.thumb_path.startswith("b2://test-bucket/") and stored.thumb_path.endswith("_thumb.webp")
+
+    full = client.get(f"/api/media/{photo['id']}?size=full")
+    assert full.status_code == 200 and full.headers["content-type"] == "image/webp"
+    assert full.content == fake_b2.objects[("test-bucket", stored.image_path.split("/", 3)[3])]
+
+    assert client.post(f"/api/books/{bid}/cover/from-item/{photo['id']}").status_code == 200
+    assert _db_book(bid).cover_image_path == stored.image_path
+    assert len(fake_b2.objects) == 2
+    assert client.get(f"/api/books/{bid}/cover?size=full").content == full.content
+
+    assert client.delete(f"/api/items/{photo['id']}").status_code == 204
+    assert len(fake_b2.objects) == 2
+    assert client.get(f"/api/books/{bid}/cover?size=full").content == full.content
+    assert client.delete(f"/api/books/{bid}/cover").status_code == 200
+    assert fake_b2.objects == {}
+    assert client.delete(f"/api/books/{bid}").status_code == 204
+    assert fake_b2.objects == {}
+
+
+def test_local_image_shared_by_cover_is_deleted_only_when_unreferenced(client: TestClient) -> None:
+    register(client)
+    bid = client.post("/api/books", json={"title": "Compartida"}).json()["id"]
+    photo = client.post(
+        f"/api/books/{bid}/photos", files=[("files", ("a.png", png_bytes(), "image/png"))]
+    ).json()[0]
+    media_dir = Path(get_settings().media_dir)
+    assert client.post(f"/api/books/{bid}/cover/from-item/{photo['id']}").status_code == 200
+    assert len(list(media_dir.rglob("*.webp"))) == 2
+
+    assert client.delete(f"/api/books/{bid}/cover").status_code == 200
+    assert len(list(media_dir.rglob("*.webp"))) == 2
+    assert client.post(f"/api/books/{bid}/cover/from-item/{photo['id']}").status_code == 200
+    assert client.delete(f"/api/items/{photo['id']}").status_code == 204
+    assert len(list(media_dir.rglob("*.webp"))) == 2
+    replaced = client.post(f"/api/books/{bid}/cover", files={"file": ("c.png", png_bytes((20, 20)), "image/png")})
+    assert replaced.status_code == 200
+    assert len(list(media_dir.rglob("*.webp"))) == 2
+    assert client.delete(f"/api/books/{bid}").status_code == 204
+    assert list(media_dir.rglob("*.webp")) == []
+
+
+def test_b2_missing_object_returns_404(client: TestClient, fake_b2: FakeB2) -> None:
+    register(client)
+    bid = client.post("/api/books", json={"title": "Nube"}).json()["id"]
+    photo = client.post(
+        f"/api/books/{bid}/photos", files=[("files", ("a.png", png_bytes(), "image/png"))]
+    ).json()[0]
+    fake_b2.objects.clear()
+    assert client.get(f"/api/media/{photo['id']}").status_code == 404
+
+
+def test_local_images_remain_readable_after_switching_to_b2(client: TestClient, monkeypatch) -> None:
+    register(client)
+    bid = client.post("/api/books", json={"title": "Mixto"}).json()["id"]
+    local_photo = client.post(
+        f"/api/books/{bid}/photos", files=[("files", ("a.png", png_bytes(), "image/png"))]
+    ).json()[0]
+    local_content = client.get(f"/api/media/{local_photo['id']}?size=full").content
+
+    fake = FakeB2()
+    for name, value in {
+        "STORAGE_BACKEND": "b2", "BACKBLAZE_KEY_ID": "id", "BACKBLAZE_APPLICATION_KEY": "key",
+        "BACKBLAZE_BUCKET": "test-bucket", "BACKBLAZE_ENDPOINT": "https://s3.eu-central-003.backblazeb2.com",
+    }.items():
+        monkeypatch.setenv(name, value)
+    get_settings.cache_clear()
+    monkeypatch.setattr("app.services.media._b2_client", lambda: fake)
+
+    assert client.get(f"/api/media/{local_photo['id']}?size=full").content == local_content
+    assert client.post(f"/api/books/{bid}/cover/from-item/{local_photo['id']}").status_code == 200
+    assert not _db_book(bid).cover_image_path.startswith("b2://")
+    assert client.get(f"/api/books/{bid}/cover?size=full").content == local_content
+    b2_photo = client.post(
+        f"/api/books/{bid}/photos", files=[("files", ("b.png", png_bytes((50, 20)), "image/png"))]
+    ).json()[0]
+    assert len(fake.objects) == 2
+    assert client.get(f"/api/media/{b2_photo['id']}").status_code == 200
+    assert client.delete(f"/api/books/{bid}").status_code == 204
+    assert fake.objects == {}
+    assert list(Path(get_settings().media_dir).rglob("*.webp")) == []
+
+
+def test_b2_requires_credentials(monkeypatch) -> None:
+    monkeypatch.setenv("STORAGE_BACKEND", "b2")
+    for name in ("BACKBLAZE_KEY_ID", "BACKBLAZE_APPLICATION_KEY", "BACKBLAZE_BUCKET", "BACKBLAZE_ENDPOINT"):
+        monkeypatch.setenv(name, "")
+    get_settings.cache_clear()
+    with pytest.raises(ValueError, match="BACKBLAZE_BUCKET"):
+        get_settings()
