@@ -1,10 +1,10 @@
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 
 from sqlmodel import Field, Relationship, SQLModel
 
 
 def utcnow() -> datetime:
-    return datetime.now(UTC)
+    return datetime.now(timezone.utc)
 
 
 class User(SQLModel, table=True):

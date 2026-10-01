@@ -1,6 +1,6 @@
 import time
 from collections import defaultdict, deque
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
 import jwt
@@ -27,7 +27,7 @@ def verify_password(password: str, hashed: str | None) -> bool:
 
 def create_access_token(user_id: int) -> str:
     settings = get_settings()
-    now = datetime.now(UTC)
+    now = datetime.now(timezone.utc)
     payload = {
         "sub": str(user_id),
         "iat": now,
