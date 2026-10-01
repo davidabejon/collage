@@ -19,14 +19,14 @@ export function ActionBar({ children }: { children: ReactNode }) {
   )
 }
 
-export function ActionButton({ label, onClick, children }: { label: string; onClick: () => void; children: ReactNode }) {
+export function ActionButton({ label, onClick, className = '', children }: { label: string; onClick: () => void; className?: string; children: ReactNode }) {
   return (
     <button
       type="button"
       aria-label={label}
       title={label}
       onClick={onClick}
-      className="grid size-9 place-items-center rounded-full bg-white/95 text-ink shadow-md ring-1 ring-black/5 transition hover:scale-110 hover:text-accent"
+      className={`grid size-9 place-items-center rounded-full bg-white/95 text-ink shadow-md ring-1 ring-black/5 transition hover:scale-110 hover:text-accent ${className}`}
     >
       {children}
     </button>

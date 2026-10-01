@@ -3,6 +3,7 @@ import {
   DragOverlay,
   KeyboardSensor,
   MouseSensor,
+  PointerSensor,
   TouchSensor,
   closestCenter,
   useSensor,
@@ -19,9 +20,10 @@ import {
   useSortable,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { useEffect, useState, type CSSProperties, type KeyboardEventHandler, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type CSSProperties, type KeyboardEventHandler, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 import type { Item, ItemUpdate } from '../../api/types'
 import { IconGrip } from '../../ui/icons'
+import { layoutGrid, type GridPlacement } from './gridLayout'
 import { ItemView } from './ItemView'
 
 type Props = {
@@ -47,6 +49,17 @@ function gridColumns() {
   return 2
 }
 
+// Drags instantly from the grip; the long-press TouchSensor still covers the rest of the item.
+class HandleSensor extends PointerSensor {
+  static activators = [
+    {
+      eventName: 'onPointerDown' as const,
+      handler: ({ nativeEvent }: ReactPointerEvent) =>
+        nativeEvent.isPrimary && nativeEvent.button === 0 && (nativeEvent.target as Element).closest('[data-drag-handle]') !== null,
+    },
+  ]
+}
+
 export function SortableGrid({ items, textColor, editable, trailing, onReorder, onUpdate, onDelete, onOpen, onFrame }: Props) {
   const [activeId, setActiveId] = useState<UniqueIdentifier | null>(null)
   const [columns, setColumns] = useState(gridColumns)
@@ -56,11 +69,16 @@ export function SortableGrid({ items, textColor, editable, trailing, onReorder, 
     return () => window.removeEventListener('resize', updateColumns)
   }, [])
   const sensors = useSensors(
+    useSensor(HandleSensor, { activationConstraint: { distance: 3 } }),
     useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 220, tolerance: 8 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   )
   const active = items.find((i) => i.id === activeId)
+  const placements = useMemo(
+    () => layoutGrid(items.map((i) => ({ cols: i.span_columns, rows: i.span_rows })), columns),
+    [items, columns],
+  )
 
   const onDragEnd = ({ active, over }: DragEndEvent) => {
     setActiveId(null)
@@ -96,13 +114,17 @@ export function SortableGrid({ items, textColor, editable, trailing, onReorder, 
         <div className="[container-type:inline-size]">
           <ul
             className="grid grid-cols-2 gap-4 sm:grid-cols-3 sm:gap-8 lg:grid-cols-4 xl:grid-cols-5"
-            style={{ gridAutoRows: `calc((100cqw - ${columns - 1} * var(--grid-gap)) / ${columns})`, '--grid-gap': columns > 2 ? '2rem' : '1rem' } as CSSProperties}
+            style={{
+              '--grid-gap': columns > 2 ? '2rem' : '1rem',
+              '--cell': `calc((100cqw - ${columns - 1} * var(--grid-gap)) / ${columns})`,
+              gridAutoRows: 'var(--cell)',
+            } as CSSProperties}
           >
-            {items.map((item) => (
+            {items.map((item, index) => (
               <SortableItem
                 key={item.id}
                 item={item}
-                columns={columns}
+                placement={placements[index]}
                 textColor={textColor}
                 editable={editable}
                 onUpdate={(data) => onUpdate(item.id, data)}
@@ -125,7 +147,7 @@ export function SortableGrid({ items, textColor, editable, trailing, onReorder, 
 
 type SortableItemProps = {
   item: Item
-  columns: number
+  placement: GridPlacement
   textColor: string
   editable: boolean
   onUpdate: (data: ItemUpdate) => void
@@ -134,40 +156,54 @@ type SortableItemProps = {
   onFrame: (aspect: number) => void
 }
 
-function SortableItem({ item, columns, textColor, editable, onUpdate, onDelete, onOpen, onFrame }: SortableItemProps) {
+const spanSize = (span: number) => `calc(${span} * var(--cell) + ${span - 1} * var(--grid-gap))`
+
+function SortableItem({ item, placement, textColor, editable, onUpdate, onDelete, onOpen, onFrame }: SortableItemProps) {
   const [editing, setEditing] = useState(false)
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
     id: item.id,
     disabled: !editable || editing,
   })
   const { onKeyDown, ...pointerListeners } = listeners ?? {}
+  const { row, col, rows, cols, spanRows, spanCols } = placement
 
   return (
     <li
-      ref={setNodeRef}
-      {...pointerListeners}
-      style={{ transform: CSS.Translate.toString(transform), transition, gridColumn: `span ${Math.min(item.span_columns, columns)}`, gridRow: `span ${item.span_rows}` }}
-      className={`group relative touch-manipulation select-none ${isDragging ? 'opacity-25' : ''} ${editable && !editing ? 'cursor-grab active:cursor-grabbing' : ''}`}
+      className="grid place-items-center"
+      style={{ gridColumn: `${col + 1} / span ${cols}`, gridRow: `${row + 1} / span ${rows}` }}
     >
-      <ItemView
-        item={item}
-        textColor={textColor}
-        onEditingChange={setEditing}
-        onUpdate={editable ? onUpdate : undefined}
-        onDelete={editable ? onDelete : undefined}
-        onOpen={onOpen}
-        onFrame={editable ? onFrame : undefined}
-      />
-      {editable && <button
-        ref={setActivatorNodeRef}
-        type="button"
-        {...attributes}
-        onKeyDown={onKeyDown as KeyboardEventHandler | undefined}
-        aria-label={`Mover ${item.type === 'note' ? 'nota' : 'foto'}`}
-        className="absolute -left-2 -top-3 z-10 grid size-9 place-items-center rounded-full bg-white/95 text-ink-soft opacity-0 shadow-md ring-1 ring-black/5 transition focus-visible:opacity-100 group-hover:opacity-100 pointer-coarse:hidden"
+      <div
+        ref={setNodeRef}
+        {...pointerListeners}
+        style={{
+          transform: CSS.Translate.toString(transform),
+          transition,
+          width: cols > spanCols ? spanSize(spanCols) : undefined,
+          height: rows > spanRows ? spanSize(spanRows) : undefined,
+        }}
+        className={`group relative size-full touch-manipulation select-none ${isDragging ? 'opacity-25' : ''} ${editable && !editing ? 'cursor-grab active:cursor-grabbing' : ''}`}
       >
-        <IconGrip width={16} height={16} />
-      </button>}
+        <ItemView
+          item={item}
+          textColor={textColor}
+          onEditingChange={setEditing}
+          onUpdate={editable ? onUpdate : undefined}
+          onDelete={editable ? onDelete : undefined}
+          onOpen={onOpen}
+          onFrame={editable ? onFrame : undefined}
+        />
+        {editable && <button
+          ref={setActivatorNodeRef}
+          type="button"
+          data-drag-handle
+          {...attributes}
+          onKeyDown={onKeyDown as KeyboardEventHandler | undefined}
+          aria-label={`Mover ${item.type === 'note' ? 'nota' : 'foto'}`}
+          className="absolute -left-2 -top-3 z-10 grid size-9 touch-none place-items-center rounded-full bg-white/95 text-ink-soft opacity-0 shadow-md ring-1 ring-black/5 transition focus-visible:opacity-100 group-hover:opacity-100 cursor-grab active:cursor-grabbing pointer-coarse:-left-3 pointer-coarse:-top-4 pointer-coarse:size-11 pointer-coarse:opacity-100"
+        >
+          <IconGrip width={16} height={16} />
+        </button>}
+      </div>
     </li>
   )
 }

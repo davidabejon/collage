@@ -173,7 +173,7 @@ function Polaroid({ item, textColor, lifted, onEditingChange, onUpdate, onDelete
 
       {onDelete && onOpen && (
         <ActionBar>
-          <ActionButton label="Ver en grande" onClick={onOpen}>
+          <ActionButton label="Ver en grande" onClick={onOpen} className="max-sm:hidden">
             <IconExpand width={16} height={16} />
           </ActionButton>
           {onFrame && (
