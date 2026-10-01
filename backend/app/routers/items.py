@@ -1,13 +1,12 @@
 from typing import Literal
 
-from fastapi import APIRouter, HTTPException, status
-from fastapi.responses import FileResponse
+from fastapi import APIRouter, HTTPException, Response, status
 
 from ..deps import SessionDep, get_owned_item
 from ..models import Item, utcnow
 from ..schemas import ItemOut, ItemUpdate
 from ..security import CurrentUser
-from ..services.media import delete_media, resolve_media
+from ..services.media import delete_media, read_media
 
 router = APIRouter(prefix="/api", tags=["items"])
 
@@ -46,13 +45,13 @@ def delete_item(item_id: int, user: CurrentUser, session: SessionDep) -> None:
 @router.get("/media/{item_id}")
 def get_media(
     item_id: int, user: CurrentUser, session: SessionDep, size: Literal["thumb", "full"] = "thumb"
-) -> FileResponse:
+) -> Response:
     item = get_owned_item(session, user, item_id)
     rel = item.thumb_path if size == "thumb" else item.image_path
     if not rel:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Imagen no encontrada")
-    return FileResponse(
-        resolve_media(rel),
+    return Response(
+        read_media(rel),
         media_type="image/webp",
         headers={"Cache-Control": "private, max-age=31536000, immutable"},
     )

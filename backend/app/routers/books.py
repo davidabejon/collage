@@ -1,5 +1,4 @@
-from fastapi import APIRouter, File, HTTPException, UploadFile, status
-from fastapi.responses import FileResponse
+from fastapi import APIRouter, File, HTTPException, Response, UploadFile, status
 from sqlalchemy import func, or_
 from sqlmodel import select
 
@@ -7,7 +6,7 @@ from ..deps import SessionDep, get_owned_book
 from ..models import Book, BookCollaborator, Item, User, utcnow
 from ..schemas import BookCreate, BookDetail, BookSummary, BookUpdate, CollaboratorAdd, ItemOut, NoteCreate, OrderUpdate, UserOut
 from ..security import CurrentUser
-from ..services.media import copy_image, delete_media, resolve_media, store_image
+from ..services.media import copy_image, delete_media, read_media, store_image
 
 router = APIRouter(prefix="/api/books", tags=["books"])
 
@@ -166,15 +165,15 @@ def remove_cover(book_id: int, user: CurrentUser, session: SessionDep) -> BookSu
 @router.get("/{book_id}/cover")
 def get_cover(
     book_id: int, user: CurrentUser, session: SessionDep, size: str = "thumb"
-) -> FileResponse:
+) -> Response:
     if size not in ("thumb", "full"):
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Tamaño no válido")
     book = get_owned_book(session, user, book_id)
     rel = book.cover_thumb_path if size == "thumb" else book.cover_image_path
     if not rel:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Portada no encontrada")
-    return FileResponse(
-        resolve_media(rel),
+    return Response(
+        read_media(rel),
         media_type="image/webp",
         headers={"Cache-Control": "private, max-age=31536000, immutable"},
     )
