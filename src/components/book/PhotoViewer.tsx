@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties, type PointerEvent } from 'react'
+import { useEffect, useRef, useState, type CSSProperties, type MouseEvent, type PointerEvent } from 'react'
 import { mediaUrl } from '../../api/endpoints'
 import type { Item } from '../../api/types'
 import { downloadPhoto } from '../../lib/download'
@@ -13,10 +13,14 @@ type Props = {
 }
 
 const SWIPE_THRESHOLD = 50
+// Nav buttons sit at left-3/right-3 with size-11 (12px + 44px), plus some slack.
+const NAV_STRIP = 64
 
 export function PhotoViewer({ photos, index, onIndexChange, onClose }: Props) {
   const ref = useRef<HTMLDialogElement>(null)
   const swipeStart = useRef<{ x: number; y: number; dragging: boolean } | null>(null)
+  const justDragged = useRef(false)
+  const thumbRef = useRef<HTMLImageElement>(null)
   const [direction, setDirection] = useState<-1 | 0 | 1>(0)
   const [dragX, setDragX] = useState(0)
   const item = index !== null ? photos[index] : undefined
@@ -65,9 +69,28 @@ export function PhotoViewer({ photos, index, onIndexChange, onClose }: Props) {
     const start = swipeStart.current
     swipeStart.current = null
     setDragX(0)
+    justDragged.current = Boolean(start?.dragging)
     if (!start?.dragging) return
     const dx = event.clientX - start.x
     if (Math.abs(dx) > SWIPE_THRESHOLD) go(dx < 0 ? 1 : -1)
+  }
+
+  const onStageClick = (event: MouseEvent<HTMLDivElement>) => {
+    if (justDragged.current || !window.matchMedia('(min-width: 640px)').matches) return
+    if ((event.target as Element).closest('button')) return
+    const stage = event.currentTarget.getBoundingClientRect()
+    if (event.clientX < stage.left + NAV_STRIP || event.clientX > stage.right - NAV_STRIP) return
+    const img = thumbRef.current
+    if (!img?.naturalWidth) return
+    // The <img> fills the stage; find the box actually painted by object-contain.
+    const box = img.getBoundingClientRect()
+    const scale = Math.min(box.width / img.naturalWidth, box.height / img.naturalHeight)
+    const width = img.naturalWidth * scale
+    const height = img.naturalHeight * scale
+    const left = box.left + (box.width - width) / 2
+    const top = box.top + (box.height - height) / 2
+    const inside = event.clientX >= left && event.clientX <= left + width && event.clientY >= top && event.clientY <= top + height
+    if (!inside) onClose()
   }
 
   const navButton = 'absolute top-1/2 -translate-y-1/2 bg-black/40 text-white hover:bg-black/60! disabled:invisible max-sm:hidden'
@@ -107,6 +130,7 @@ export function PhotoViewer({ photos, index, onIndexChange, onClose }: Props) {
             }}
             onPointerMove={onPointerMove}
             onPointerUp={onPointerUp}
+            onClick={onStageClick}
             onPointerCancel={() => {
               swipeStart.current = null
               setDragX(0)
@@ -121,7 +145,7 @@ export function PhotoViewer({ photos, index, onIndexChange, onClose }: Props) {
                 className="absolute inset-0 animate-[slide-in_.32s_cubic-bezier(.2,.8,.2,1)]"
                 style={{ '--slide-from': `${direction * 30}%` } as CSSProperties}
               >
-                <img src={mediaUrl(item)} alt="" aria-hidden="true" draggable={false} className="absolute inset-0 size-full object-contain" />
+                <img ref={thumbRef} src={mediaUrl(item)} alt="" aria-hidden="true" draggable={false} className="absolute inset-0 size-full object-contain" />
                 <img
                   src={mediaUrl(item, 'full')}
                   alt={item.caption || 'Foto'}
