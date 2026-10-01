@@ -72,6 +72,8 @@ export function PhotoViewer({ photos, index, onIndexChange, onClose }: Props) {
   const moved = useRef(false)
   const pointerType = useRef('mouse')
   const lastTap = useRef<{ time: number; x: number; y: number } | null>(null)
+  const singleTapTimer = useRef<number | undefined>(undefined)
+  const [chromeHidden, setChromeHidden] = useState(false)
   const [direction, setDirection] = useState<-1 | 0 | 1>(0)
   const [dragX, setDragX] = useState(0)
   const [overPhoto, setOverPhoto] = useState(false)
@@ -88,10 +90,13 @@ export function PhotoViewer({ photos, index, onIndexChange, onClose }: Props) {
     if (!dialog) return
     if (item && !dialog.open) {
       setDirection(0)
+      setChromeHidden(false)
       dialog.showModal()
     }
     if (!item && dialog.open) dialog.close()
   }, [item])
+
+  useEffect(() => () => window.clearTimeout(singleTapTimer.current), [])
 
   useEffect(() => {
     if (index === null) return
@@ -164,6 +169,8 @@ export function PhotoViewer({ photos, index, onIndexChange, onClose }: Props) {
 
   const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {
     if ((event.target as Element).closest('button')) return
+    // A primary pointer means no other touch is down; drop any pointer whose end event was lost.
+    if (event.isPrimary) pointers.current.clear()
     pointerType.current = event.pointerType
     pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY })
     event.currentTarget.setPointerCapture(event.pointerId)
@@ -199,6 +206,7 @@ export function PhotoViewer({ photos, index, onIndexChange, onClose }: Props) {
     } else if (g?.type === 'swipe') {
       const dx = event.clientX - g.start.x
       if (!g.dragging) {
+        if (Math.hypot(dx, event.clientY - g.start.y) >= 10) moved.current = true
         if (Math.abs(dx) < 10 || Math.abs(dx) < Math.abs(event.clientY - g.start.y)) return
         g.dragging = true
         moved.current = true
@@ -224,25 +232,38 @@ export function PhotoViewer({ photos, index, onIndexChange, onClose }: Props) {
     } else if (pointers.current.size === 0) {
       gesture.current = null
     }
+    // Mobile browsers may skip the click after a swipe re-renders the photo, so taps are detected here.
+    if (event.type === 'pointerup' && event.pointerType !== 'mouse' && !moved.current && pointers.current.size === 0) {
+      onTouchTap(event.clientX, event.clientY, event.timeStamp)
+    }
+  }
+
+  const onTouchTap = (clientX: number, clientY: number, time: number) => {
+    const previous = lastTap.current
+    const isDouble =
+      previous && time - previous.time < DOUBLE_TAP_MS && Math.hypot(clientX - previous.x, clientY - previous.y) < DOUBLE_TAP_DISTANCE
+    lastTap.current = isDouble ? null : { time, x: clientX, y: clientY }
+    window.clearTimeout(singleTapTimer.current)
+    if (!isDouble) {
+      // Wait out the double-tap window so a zoom gesture doesn't also flash the UI.
+      singleTapTimer.current = window.setTimeout(() => setChromeHidden((hidden) => !hidden), DOUBLE_TAP_MS)
+      return
+    }
+    const geo = geometry(stageRef.current!, thumbRef.current)
+    const point = toLocal(geo.rect, clientX, clientY)
+    if (zoomed) {
+      updateView(IDENTITY, true)
+      setChromeHidden(false)
+    } else if (isOnPhoto(point, geo)) {
+      updateView(zoomAt(IDENTITY, point, CLICK_ZOOM), true)
+      setChromeHidden(true)
+    }
   }
 
   const onStageClick = (event: MouseEvent<HTMLDivElement>) => {
-    if (moved.current || (event.target as Element).closest('button')) return
+    if (pointerType.current !== 'mouse' || moved.current || (event.target as Element).closest('button')) return
     const geo = geometry(event.currentTarget, thumbRef.current)
     const point = toLocal(geo.rect, event.clientX, event.clientY)
-
-    if (pointerType.current !== 'mouse') {
-      const previous = lastTap.current
-      const isDouble =
-        previous &&
-        event.timeStamp - previous.time < DOUBLE_TAP_MS &&
-        Math.hypot(event.clientX - previous.x, event.clientY - previous.y) < DOUBLE_TAP_DISTANCE
-      lastTap.current = isDouble ? null : { time: event.timeStamp, x: event.clientX, y: event.clientY }
-      if (!isDouble) return
-      if (zoomed) updateView(IDENTITY, true)
-      else if (isOnPhoto(point, geo)) updateView(zoomAt(IDENTITY, point, CLICK_ZOOM), true)
-      return
-    }
 
     if (zoomed) return updateView(IDENTITY, true)
     if (isOnPhoto(point, geo)) return updateView(zoomAt(IDENTITY, point, CLICK_ZOOM), true)
@@ -252,6 +273,8 @@ export function PhotoViewer({ photos, index, onIndexChange, onClose }: Props) {
   }
 
   const navButton = 'absolute top-1/2 -translate-y-1/2 bg-black/40 text-white hover:bg-black/60! disabled:invisible max-sm:hidden'
+  // Collapsing the grid row (not just fading) lets the stage reclaim the bars' space.
+  const chrome = `grid transition-[grid-template-rows,opacity] duration-300 ease-out ${chromeHidden ? 'pointer-events-none grid-rows-[0fr] opacity-0' : 'grid-rows-[1fr] opacity-100'}`
 
   return (
     <dialog
@@ -265,16 +288,20 @@ export function PhotoViewer({ photos, index, onIndexChange, onClose }: Props) {
     >
       {item && index !== null && (
         <div className="flex size-full flex-col">
-          <div className="flex items-center gap-1 px-2 pb-1 pt-[max(0.5rem,env(safe-area-inset-top))]">
-            <IconButton label="Cerrar" onClick={onClose} className="hover:bg-white/10!">
-              <IconClose />
-            </IconButton>
-            <span className="grow text-sm tabular-nums text-white/75">
-              {index + 1} / {photos.length}
-            </span>
-            <IconButton label="Descargar" onClick={() => downloadPhoto(item)} className="hover:bg-white/10!">
-              <IconDownload />
-            </IconButton>
+          <div inert={chromeHidden} className={chrome}>
+            <div className="min-h-0 overflow-hidden">
+              <div className="flex items-center gap-1 px-2 pb-1 pt-[max(0.5rem,env(safe-area-inset-top))]">
+                <IconButton label="Cerrar" onClick={onClose} className="hover:bg-white/10!">
+                  <IconClose />
+                </IconButton>
+                <span className="grow text-sm tabular-nums text-white/75">
+                  {index + 1} / {photos.length}
+                </span>
+                <IconButton label="Descargar" onClick={() => downloadPhoto(item)} className="hover:bg-white/10!">
+                  <IconDownload />
+                </IconButton>
+              </div>
+            </div>
           </div>
 
           <div
@@ -317,12 +344,16 @@ export function PhotoViewer({ photos, index, onIndexChange, onClose }: Props) {
             </IconButton>
           </div>
 
-          <p
-            key={item.id}
-            className="flex min-h-14 animate-[fade-in_.32s_ease-out] items-center justify-center px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 text-center font-hand text-2xl sm:text-3xl"
-          >
-            {item.caption}
-          </p>
+          <div className={chrome}>
+            <div className="min-h-0 overflow-hidden">
+              <p
+                key={item.id}
+                className="flex min-h-14 animate-[fade-in_.32s_ease-out] items-center justify-center px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 text-center font-hand text-2xl sm:text-3xl"
+              >
+                {item.caption}
+              </p>
+            </div>
+          </div>
         </div>
       )}
     </dialog>
