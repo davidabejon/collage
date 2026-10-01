@@ -93,3 +93,7 @@ class ItemUpdate(BaseModel):
 
 class OrderUpdate(BaseModel):
     item_ids: list[int] = Field(max_length=5000)
+
+
+class ItemIds(BaseModel):
+    item_ids: list[int] = Field(min_length=1, max_length=500)

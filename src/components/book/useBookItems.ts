@@ -40,6 +40,13 @@ export function useBookItems(bookId: number) {
     onError: refreshOnError,
   })
 
+  const removeMany = useMutation({
+    mutationFn: (ids: number[]) => booksApi.removeItems(bookId, ids),
+    onMutate: (ids) => setItems((items) => items.filter((i) => !ids.includes(i.id))),
+    onSuccess: touchLibrary,
+    onError: refreshOnError,
+  })
+
   const reorder = useMutation({
     mutationFn: (items: Item[]) => booksApi.reorder(bookId, items.map((i) => i.id)),
     onMutate: (items) => setItems(() => items),
@@ -52,5 +59,5 @@ export function useBookItems(bookId: number) {
     touchLibrary()
   }
 
-  return { addNote, update, remove, reorder, upload }
+  return { addNote, update, remove, removeMany, reorder, upload }
 }

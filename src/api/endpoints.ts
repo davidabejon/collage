@@ -30,6 +30,8 @@ export const booksApi = {
   remove: (id: number) => request<void>(`/books/${id}`, { method: 'DELETE' }),
   reorder: (id: number, itemIds: number[]) =>
     request<void>(`/books/${id}/order`, { method: 'PUT', body: json({ item_ids: itemIds }) }),
+  removeItems: (id: number, itemIds: number[]) =>
+    request<void>(`/books/${id}/items/delete`, { method: 'POST', body: json({ item_ids: itemIds }) }),
   uploadPhotos: (id: number, files: File[]) => {
     const form = new FormData()
     files.forEach((f) => form.append('files', f))

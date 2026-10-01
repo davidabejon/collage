@@ -4,7 +4,7 @@ from sqlmodel import select
 
 from ..deps import SessionDep, get_owned_book
 from ..models import Book, BookCollaborator, Item, User, utcnow
-from ..schemas import BookCreate, BookDetail, BookSummary, BookUpdate, CollaboratorAdd, ItemOut, NoteCreate, OrderUpdate, UserOut
+from ..schemas import BookCreate, BookDetail, BookSummary, BookUpdate, CollaboratorAdd, ItemIds, ItemOut, NoteCreate, OrderUpdate, UserOut
 from ..security import CurrentUser
 from ..services.media import delete_media, delete_unreferenced, read_media, store_image
 
@@ -245,3 +245,19 @@ def reorder_items(book_id: int, data: OrderUpdate, user: CurrentUser, session: S
     book.updated_at = utcnow()
     session.add(book)
     session.commit()
+
+
+@router.post("/{book_id}/items/delete", status_code=status.HTTP_204_NO_CONTENT)
+def delete_items(book_id: int, data: ItemIds, user: CurrentUser, session: SessionDep) -> None:
+    book = get_owned_book(session, user, book_id)
+    by_id = {item.id: item for item in book.items}
+    ids = set(data.item_ids)
+    if not ids <= by_id.keys():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Algunos elementos no pertenecen al libro")
+    paths = [p for item_id in ids for p in (by_id[item_id].image_path, by_id[item_id].thumb_path)]
+    for item_id in ids:
+        session.delete(by_id[item_id])
+    book.updated_at = utcnow()
+    session.add(book)
+    session.commit()
+    delete_unreferenced(session, *paths)

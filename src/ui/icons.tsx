@@ -126,3 +126,30 @@ export const IconGrip = (p: IconProps) => (
     {[8, 16].map((x) => [6, 12, 18].map((y) => <circle key={`${x}-${y}`} cx={x} cy={y} r="1.1" fill="currentColor" />))}
   </Icon>
 )
+
+export const IconGrid = (p: IconProps) => (
+  <Icon {...p}>
+    <rect x="4" y="4" width="6.5" height="6.5" rx="1" />
+    <rect x="13.5" y="4" width="6.5" height="6.5" rx="1" />
+    <rect x="4" y="13.5" width="6.5" height="6.5" rx="1" />
+    <rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1" />
+  </Icon>
+)
+
+export const IconDownload = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M12 4v11M7 10l5 5 5-5M5 20h14" />
+  </Icon>
+)
+
+export const IconChevronLeft = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M15 5l-7 7 7 7" />
+  </Icon>
+)
+
+export const IconChevronRight = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M9 5l7 7-7 7" />
+  </Icon>
+)

@@ -229,6 +229,32 @@ def test_upload_notes_reorder_and_cascade(client: TestClient) -> None:
     assert list(media_dir.rglob("*.webp")) == []
 
 
+def test_bulk_delete_items(client: TestClient) -> None:
+    register(client, "ana")
+    bid = client.post("/api/books", json={"title": "Muchas"}).json()["id"]
+    other = client.post("/api/books", json={"title": "Otro"}).json()["id"]
+    photos = client.post(
+        f"/api/books/{bid}/photos", files=[("files", (f"{n}.png", png_bytes(), "image/png")) for n in "abc"]
+    ).json()
+    foreign = client.post(
+        f"/api/books/{other}/photos", files=[("files", ("x.png", png_bytes(), "image/png"))]
+    ).json()[0]
+    ids = [p["id"] for p in photos]
+    media_dir = Path(get_settings().media_dir)
+
+    assert client.post(f"/api/books/{bid}/items/delete", json={"item_ids": [ids[0], foreign["id"]]}).status_code == 400
+    assert client.post(f"/api/books/{bid}/items/delete", json={"item_ids": []}).status_code == 422
+    assert len(client.get(f"/api/books/{bid}").json()["items"]) == 3
+
+    assert client.post(f"/api/books/{bid}/items/delete", json={"item_ids": ids[:2]}).status_code == 204
+    assert [i["id"] for i in client.get(f"/api/books/{bid}").json()["items"]] == ids[2:]
+    assert len(list(media_dir.rglob("*.webp"))) == 4
+
+    client.post("/api/auth/logout")
+    register(client, "eva")
+    assert client.post(f"/api/books/{bid}/items/delete", json={"item_ids": ids[2:]}).status_code == 404
+
+
 def test_invalid_uploads(client: TestClient) -> None:
     register(client)
     bid = client.post("/api/books", json={"title": "X"}).json()["id"]

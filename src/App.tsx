@@ -5,6 +5,7 @@ import { ME_KEY } from './auth/useAuth'
 import { GuestRoute, ProtectedRoute } from './auth/ProtectedRoute'
 import { AuthPage } from './pages/AuthPage'
 import { BookPage } from './pages/BookPage'
+import { BookPhotosPage } from './pages/BookPhotosPage'
 import { LibraryPage } from './pages/LibraryPage'
 import { ToastProvider } from './ui/ToastProvider'
 
@@ -33,6 +34,7 @@ export default function App() {
             <Route path="/register" element={<GuestRoute><AuthPage mode="register" /></GuestRoute>} />
             <Route path="/" element={<ProtectedRoute><LibraryPage /></ProtectedRoute>} />
             <Route path="/books/:id" element={<ProtectedRoute><BookPage /></ProtectedRoute>} />
+            <Route path="/books/:id/fotos" element={<ProtectedRoute><BookPhotosPage /></ProtectedRoute>} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </BrowserRouter>

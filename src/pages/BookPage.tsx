@@ -11,7 +11,7 @@ import { BookSettingsDialog } from '../components/library/BookSettingsDialog'
 import { NOTE_COLORS, tiltFor } from '../lib/design'
 import { Button, IconButton, Spinner } from '../ui/Button'
 import { ConfirmDialog } from '../ui/ConfirmDialog'
-import { IconBack, IconCamera, IconDots, IconEdit, IconEye, IconNote, IconPalette } from '../ui/icons'
+import { IconBack, IconCamera, IconDots, IconEdit, IconEye, IconGrid, IconNote, IconPalette } from '../ui/icons'
 import { useToast } from '../ui/toast'
 
 const MAX_MB = 15
@@ -119,6 +119,14 @@ export function BookPage() {
               ))}
             </div>
           )}
+          <Link
+            to={`/books/${bookId}/fotos`}
+            aria-label="Ver todas las fotos"
+            title="Ver todas las fotos"
+            className="inline-flex size-11 shrink-0 items-center justify-center rounded-full transition hover:bg-black/5"
+          >
+            <IconGrid />
+          </Link>
           <Button variant={isEditing ? 'secondary' : 'primary'} onClick={toggleEditing} className="shrink-0 px-3 sm:px-4">
             {isEditing ? <IconEye /> : <IconEdit />}
             {isEditing ? 'Ver álbum' : 'Editar'}
