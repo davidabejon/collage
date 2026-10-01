@@ -6,7 +6,7 @@ from ..deps import SessionDep, get_owned_item
 from ..models import Item, utcnow
 from ..schemas import ItemOut, ItemUpdate
 from ..security import CurrentUser
-from ..services.media import delete_media, read_media
+from ..services.media import delete_unreferenced, read_media
 
 router = APIRouter(prefix="/api", tags=["items"])
 
@@ -39,7 +39,7 @@ def delete_item(item_id: int, user: CurrentUser, session: SessionDep) -> None:
     item.book.updated_at = utcnow()
     session.delete(item)
     session.commit()
-    delete_media(*paths)
+    delete_unreferenced(session, *paths)
 
 
 @router.get("/media/{item_id}")

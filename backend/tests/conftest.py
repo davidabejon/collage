@@ -63,7 +63,12 @@ class FakeB2:
             raise ClientError({"Error": {"Code": "NoSuchKey"}}, "GetObject")
         return {"Body": io.BytesIO(self.objects[(Bucket, Key)])}
 
-    def delete_object(self, Bucket: str, Key: str) -> None:
+    def list_object_versions(self, Bucket: str, Prefix: str) -> dict:
+        keys = [key for bucket, key in self.objects if bucket == Bucket and key.startswith(Prefix)]
+        return {"Versions": [{"Key": key, "VersionId": f"v-{key}"} for key in keys]}
+
+    def delete_object(self, Bucket: str, Key: str, VersionId: str) -> None:
+        assert VersionId == f"v-{Key}"
         self.objects.pop((Bucket, Key), None)
 
 

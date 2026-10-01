@@ -12,8 +12,11 @@ from botocore.exceptions import BotoCoreError, ClientError
 from fastapi import HTTPException, UploadFile, status
 from fastapi.concurrency import run_in_threadpool
 from PIL import Image, ImageOps, UnidentifiedImageError
+from sqlalchemy import or_
+from sqlmodel import Session, select
 
 from ..config import get_settings
+from ..models import Book, Item
 
 ALLOWED_FORMATS = {"JPEG", "PNG", "WEBP", "GIF", "MPO"}
 FULL_MAX_SIDE = 2400
@@ -100,7 +103,12 @@ def _delete(ref: str) -> None:
     if ref.startswith(B2_PREFIX):
         try:
             bucket, key = _b2_location(ref)
-            _b2_client().delete_object(Bucket=bucket, Key=key)
+            client = _b2_client()
+            # B2 keeps versions: a plain delete only hides the file, so remove every version.
+            listing = client.list_object_versions(Bucket=bucket, Prefix=key)
+            for version in listing.get("Versions", []) + listing.get("DeleteMarkers", []):
+                if version["Key"] == key:
+                    client.delete_object(Bucket=bucket, Key=key, VersionId=version["VersionId"])
         except (HTTPException, ClientError, BotoCoreError):
             logger.exception("No se pudo borrar %s de Backblaze", ref)
         return
@@ -174,11 +182,20 @@ async def store_image(upload: UploadFile, user_id: int) -> tuple[str, str]:
     return await run_in_threadpool(_save_pair, user_id, full, thumb)
 
 
-def copy_image(full_ref: str, thumb_ref: str, user_id: int) -> tuple[str, str]:
-    return _save_pair(user_id, read_media(full_ref), read_media(thumb_ref))
-
-
 def delete_media(*refs: str | None) -> None:
     for ref in refs:
         if ref:
+            _delete(ref)
+
+
+def delete_unreferenced(session: Session, *refs: str | None) -> None:
+    """Deletes stored files that no item or book cover references anymore. Call after committing."""
+    for ref in {r for r in refs if r}:
+        in_items = session.exec(
+            select(Item.id).where(or_(Item.image_path == ref, Item.thumb_path == ref)).limit(1)
+        ).first()
+        in_covers = session.exec(
+            select(Book.id).where(or_(Book.cover_image_path == ref, Book.cover_thumb_path == ref)).limit(1)
+        ).first()
+        if in_items is None and in_covers is None:
             _delete(ref)

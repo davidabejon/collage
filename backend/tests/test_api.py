@@ -370,14 +370,39 @@ def test_b2_storage_upload_read_cover_and_delete(client: TestClient, fake_b2: Fa
     assert full.content == fake_b2.objects[("test-bucket", stored.image_path.split("/", 3)[3])]
 
     assert client.post(f"/api/books/{bid}/cover/from-item/{photo['id']}").status_code == 200
-    assert _db_book(bid).cover_image_path.startswith("b2://test-bucket/")
-    assert len(fake_b2.objects) == 4
+    assert _db_book(bid).cover_image_path == stored.image_path
+    assert len(fake_b2.objects) == 2
     assert client.get(f"/api/books/{bid}/cover?size=full").content == full.content
 
     assert client.delete(f"/api/items/{photo['id']}").status_code == 204
     assert len(fake_b2.objects) == 2
+    assert client.get(f"/api/books/{bid}/cover?size=full").content == full.content
+    assert client.delete(f"/api/books/{bid}/cover").status_code == 200
+    assert fake_b2.objects == {}
     assert client.delete(f"/api/books/{bid}").status_code == 204
     assert fake_b2.objects == {}
+
+
+def test_local_image_shared_by_cover_is_deleted_only_when_unreferenced(client: TestClient) -> None:
+    register(client)
+    bid = client.post("/api/books", json={"title": "Compartida"}).json()["id"]
+    photo = client.post(
+        f"/api/books/{bid}/photos", files=[("files", ("a.png", png_bytes(), "image/png"))]
+    ).json()[0]
+    media_dir = Path(get_settings().media_dir)
+    assert client.post(f"/api/books/{bid}/cover/from-item/{photo['id']}").status_code == 200
+    assert len(list(media_dir.rglob("*.webp"))) == 2
+
+    assert client.delete(f"/api/books/{bid}/cover").status_code == 200
+    assert len(list(media_dir.rglob("*.webp"))) == 2
+    assert client.post(f"/api/books/{bid}/cover/from-item/{photo['id']}").status_code == 200
+    assert client.delete(f"/api/items/{photo['id']}").status_code == 204
+    assert len(list(media_dir.rglob("*.webp"))) == 2
+    replaced = client.post(f"/api/books/{bid}/cover", files={"file": ("c.png", png_bytes((20, 20)), "image/png")})
+    assert replaced.status_code == 200
+    assert len(list(media_dir.rglob("*.webp"))) == 2
+    assert client.delete(f"/api/books/{bid}").status_code == 204
+    assert list(media_dir.rglob("*.webp")) == []
 
 
 def test_b2_missing_object_returns_404(client: TestClient, fake_b2: FakeB2) -> None:
@@ -409,8 +434,13 @@ def test_local_images_remain_readable_after_switching_to_b2(client: TestClient, 
 
     assert client.get(f"/api/media/{local_photo['id']}?size=full").content == local_content
     assert client.post(f"/api/books/{bid}/cover/from-item/{local_photo['id']}").status_code == 200
-    assert _db_book(bid).cover_image_path.startswith("b2://test-bucket/")
+    assert not _db_book(bid).cover_image_path.startswith("b2://")
     assert client.get(f"/api/books/{bid}/cover?size=full").content == local_content
+    b2_photo = client.post(
+        f"/api/books/{bid}/photos", files=[("files", ("b.png", png_bytes((50, 20)), "image/png"))]
+    ).json()[0]
+    assert len(fake.objects) == 2
+    assert client.get(f"/api/media/{b2_photo['id']}").status_code == 200
     assert client.delete(f"/api/books/{bid}").status_code == 204
     assert fake.objects == {}
     assert list(Path(get_settings().media_dir).rglob("*.webp")) == []
